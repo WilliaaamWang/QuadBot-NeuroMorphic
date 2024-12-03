@@ -1,0 +1,16 @@
+* text=auto
+*.ipynb filter=clean_ipynb
+
+*.mlapp binary
+*.mlx binary
+*.mat binary
+*.fig binary 
+*.mlapp binary
+*.mdl binary
+*.slx binary
+*.slxc binary
+*.mdlp binary
+*.slxp binary
+*.sldd binary
+*.p binary
+*.autosave binary

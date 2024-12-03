@@ -304,11 +304,11 @@ g_f, g_s, g_us = 1.0, 0.5, 0.015 # Conductance
 C = 0.82 # Capacitance
 
 # Simulate and charactersise
-t1 = clock.time()
+t1 = clock.time()  
 V_MQIF, Vs, Vus, spikes, time = simulate_MQIF(num_steps, dt, -52, -50, -52, I_ext, V_t, V_r, Vs_r, d_Vus, g_f, g_s, g_us, 4.3, 278, C)
 f, s, t, d = characterise_spiketrain(dt, spikes)
 elapsed2 = clock.time() - t1
 
 #print(f"A simulation plus characterisation takes {elapsed2} seconds.")
 print(f"Frequency: {f} Hz, Spikes per Burst: {s}, Duration: {t} s, Duty Cycle: {d} %")
-plot_MQIF(time, I_ext, V_MQIF, Vs, Vus)
+plot_MQIF(time, I_ext, V_MQIF, Vs, Vus, state_variables=False, phase_portrait=False)
