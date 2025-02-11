@@ -1,0 +1,18 @@
+{
+	"extension": {
+		"version": "0.6.1",
+		"json": 2
+	},
+	"project": {
+		"name": "testmotor",
+		"description": "",
+		"creationDate": "1/17/2025, 2:11:42 AM",
+		"platform": "V5",
+		"language": "python",
+		"slot": 3,
+		"sdkVersion": "V5_1_0_1_25",
+		"python": {
+			"main": "src/main.py"
+		}
+	}
+}

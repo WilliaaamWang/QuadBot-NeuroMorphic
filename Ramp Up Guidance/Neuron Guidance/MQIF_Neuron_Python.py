@@ -311,4 +311,4 @@ elapsed2 = clock.time() - t1
 
 #print(f"A simulation plus characterisation takes {elapsed2} seconds.")
 print(f"Frequency: {f} Hz, Spikes per Burst: {s}, Duration: {t} s, Duty Cycle: {d} %")
-plot_MQIF(time, I_ext, V_MQIF, Vs, Vus, state_variables=False, phase_portrait=False)
+plot_MQIF(time, I_ext, V_MQIF, Vs, Vus, state_variables=True, phase_portrait=False)

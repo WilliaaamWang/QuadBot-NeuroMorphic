@@ -1,4 +1,4 @@
-% Initialise control variables for DogGait_Sine
+% Initialise control variables for NeuroPup
 k1 = 1200;
 k2 = 10;
 k3 = 10;
