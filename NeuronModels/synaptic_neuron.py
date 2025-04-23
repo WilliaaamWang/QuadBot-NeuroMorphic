@@ -16,7 +16,9 @@ class SynapticNeuron:
         V0 = -52, Vs0 = -50, Vus0 = -52,
         tau_s = 4.3, tau_us = 278,
         g_f = 1.0, g_s = 0.5, g_us = 0.015,
-        V_threshold = 20, V_reset = -45, Vs_reset = 7.5,
+        # V_threshold = 20, V_peak = 15,
+        V_threshold = 20, V_peak = 20,
+        V_reset = -45, Vs_reset = 7.5,
         delta_Vus = 1.7,
         # Synaptic parameters
         Ve0 = 0, Vi0 = -90,
@@ -24,7 +26,7 @@ class SynapticNeuron:
         g_syn_e = 0.5, g_syn_i = 30,
         tau_e = 50, tau_i = 50,
         cap = 0.82, k = 250.0,
-        I_ext=0.0, excitatory_Vin=-52, inhibitory_Vin=-52,):
+        I_ext=0.0, excitatory_Vin=None, inhibitory_Vin=None,):
 
         self.V0 = V0
         self.Vs0 = Vs0
@@ -37,6 +39,7 @@ class SynapticNeuron:
         self.V_threshold = V_threshold
         self.V_reset = V_reset
         self.Vs_reset = Vs_reset
+        self.V_peak = V_peak
         self.delta_Vus = delta_Vus
         self.Ve0 = Ve0
         self.Vi0 = Vi0
@@ -104,15 +107,56 @@ class SynapticNeuron:
         if inhibitory_Vin is not None:
             self.inhibitory_Vin = inhibitory_Vin
 
+    # def update_state(self, dt):
+    #     dV, dVs, dVus, dSe, dSi = self.compute_derivatives()
+    #     V_new = forward_euler(self.V, dt, dV)
+    #     Vs_new = forward_euler(self.Vs, dt, dVs)
+    #     Vus_new = forward_euler(self.Vus, dt, dVus)
+    #     Se_new = forward_euler(self.Se, dt, dSe)
+    #     Si_new = forward_euler(self.Si, dt, dSi)
+
+    #     if V_new >= self.V_threshold:
+    #         self.V = self.V_reset
+    #         self.Vs = self.Vs_reset
+    #         self.Vus += self.delta_Vus
+    #         self.Se = np.zeros_like(self.excitatory_Vin)
+    #         self.Si = np.zeros_like(self.inhibitory_Vin)
+    #     else:
+    #         self.V = V_new
+    #         self.Vs = Vs_new
+    #         self.Vus = Vus_new
+    #         self.Se = Se_new
+    #         self.Si = Si_new
+
+    #     self.Vvalues.append(self.V)
+    #     # self.Vsvalues.append(self.Vs)
+    #     # self.Vusvalues.append(self.Vus)
+    #     self.Sevalues.append(self.Se)
+    #     self.Sivalues.append(self.Si)
+
     def update_state(self, dt):
         dV, dVs, dVus, dSe, dSi = self.compute_derivatives()
+        
+        # First calculate value of V_new 
         V_new = forward_euler(self.V, dt, dV)
-        Vs_new = forward_euler(self.Vs, dt, dVs)
-        Vus_new = forward_euler(self.Vus, dt, dVus)
-        Se_new = forward_euler(self.Se, dt, dSe)
-        Si_new = forward_euler(self.Si, dt, dSi)
 
         if V_new >= self.V_threshold:
+            # Set neuron voltage to fixed V_peak
+            self.V = self.V_peak
+
+            # # Recompute new derivatives based on V=V_peak
+            # dV, dVs, dVus, dSe, dSi = self.compute_derivatives()
+
+            # # Update values of Vs, Vus, Se, Si
+            # Vs_new = forward_euler(self.Vs, dt, dVs)
+            # Vus_new = forward_euler(self.Vus, dt, dVus)
+            # Se_new = forward_euler(self.Se, dt, dSe)
+            # Si_new = forward_euler(self.Si, dt, dSi)
+            
+            # Append peak value V_peak to Vvalues
+            self.Vvalues.append(self.V)
+
+            # Reset after spiking action
             self.V = self.V_reset
             self.Vs = self.Vs_reset
             self.Vus += self.delta_Vus
@@ -120,20 +164,27 @@ class SynapticNeuron:
             self.Si = np.zeros_like(self.inhibitory_Vin)
         else:
             self.V = V_new
+
+            Vs_new = forward_euler(self.Vs, dt, dVs)
+            Vus_new = forward_euler(self.Vus, dt, dVus)
+            Se_new = forward_euler(self.Se, dt, dSe)
+            Si_new = forward_euler(self.Si, dt, dSi)
+
             self.Vs = Vs_new
             self.Vus = Vus_new
             self.Se = Se_new
             self.Si = Si_new
 
-        self.Vvalues.append(self.V)
+            self.Vvalues.append(self.V)
+
         # self.Vsvalues.append(self.Vs)
         # self.Vusvalues.append(self.Vus)
         self.Sevalues.append(self.Se)
         self.Sivalues.append(self.Si)
 
 
-def simulate_neuron_excit(current_ext, dt):
-    runtime = 5.0
+def simulate_neuron_excit(current_ext, dt, runtime):
+    # runtime = 5.0
     numsteps = int(runtime / dt)
     time = np.arange(0, runtime, dt)
 
@@ -212,9 +263,9 @@ def simulate_neuron_excit(current_ext, dt):
     
     plt.tight_layout()
     if current_ext[-1] == 0:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_excit_{decay_time}decay.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_excit_{decay_time}decay_{runtime}s.png'))
     else:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_excit_{decay_time}decay.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_excit_{decay_time}decay_{runtime}s.png'))
     plt.show()
     # plt.close()
  
@@ -227,9 +278,9 @@ def simulate_neuron_excit(current_ext, dt):
     plt.legend()
     # plt.show()
     if current_ext[-1] == 0:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_excit_{decay_time}decay_current.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_excit_{decay_time}decay_current_{runtime}s.png'))
     else:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay_current.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay_current_{runtime}s.png'))
     plt.close()
 
     # sigmoid_time = sigmoid(time)
@@ -243,8 +294,8 @@ def simulate_neuron_excit(current_ext, dt):
     # plt.savefig(os.path.join(os.getcwd(), 'NeuronModels/synaptic_neuron_sigmoid.png'))
     # plt.show()
 
-def simulate_neuron_inhib(current_ext, dt):
-    runtime = 5.0
+def simulate_neuron_inhib(current_ext, dt, runtime):
+    # runtime = 5.0
     numsteps = int(runtime / dt)
     time = np.arange(0, runtime, dt)
     
@@ -323,9 +374,9 @@ def simulate_neuron_inhib(current_ext, dt):
     
     plt.tight_layout()
     if current_ext[-1] == 0:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_inhib_{decay_time}decay.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_inhib_{decay_time}decay_{runtime}s.png'))
     else:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay_{runtime}s.png'))
     plt.show()
     # plt.close()
 
@@ -342,9 +393,9 @@ def simulate_neuron_inhib(current_ext, dt):
     plt.legend()
     # plt.show()
     if current_ext[-1] == 0:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_inhib_{decay_time}decay_current.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/NoI_inhib_{decay_time}decay_{runtime}s_current.png'))
     else:
-        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay_current.png'))
+        plt.savefig(os.path.join(os.getcwd(), f'NeuronModels/SynapticMQIF_Plots/I_inhib_{decay_time}decay_{runtime}s_current.png'))
     plt.close()
 
     # sigmoid_time = sigmoid(time)
@@ -485,18 +536,20 @@ def simulate_neuron(current_ext, dt, runtime):
 
 def main():
     dt = 5e-5
-    runtime = 5.0
+    runtime = 15.0
     # runtime = 10.0
     numsteps = int(runtime / dt)
     time = np.arange(0, runtime, dt)
     # Constant current input
     amplitude = 5
     current_ext = np.zeros(numsteps)
-    current_ext[numsteps//10:] = amplitude
+    start_time = int(0.5/dt)
+    # start_time = numsteps // 10
+    current_ext[start_time:] = amplitude
     
-    simulate_neuron_excit(current_ext, dt)
-    simulate_neuron_inhib(current_ext, dt)
-    simulate_neuron(current_ext, dt, runtime)
+    simulate_neuron_excit(current_ext, dt, runtime)
+    # simulate_neuron_inhib(current_ext, dt, runtime)
+    # simulate_neuron(current_ext, dt, runtime)
 
 if __name__ == "__main__":
     main()

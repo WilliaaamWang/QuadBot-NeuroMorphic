@@ -1,6 +1,7 @@
 import numpy as np
-import os
 import matplotlib.pyplot as plt
+import os
+# import copy
 # from synaptic_neuron import SynapticNeuron
 
 def sigmoid(x: np.array) -> np.array:
@@ -17,7 +18,8 @@ class SynapticNeuron:
         V0 = -52, Vs0 = -50, Vus0 = -52,
         tau_s = 4.3, tau_us = 278,
         g_f = 1.0, g_s = 0.5, g_us = 0.015,
-        V_threshold = 20, V_reset = -45, Vs_reset = 7.5,
+        V_threshold = 20, V_peak = 20,
+        V_reset = -45, Vs_reset = 7.5,
         delta_Vus = 1.7,
         # Synaptic parameters
         Ve0 = 0, Vi0 = -90,
@@ -39,6 +41,7 @@ class SynapticNeuron:
         self.V_threshold = V_threshold
         self.V_reset = V_reset
         self.Vs_reset = Vs_reset
+        self.V_peak = V_peak
         self.delta_Vus = delta_Vus
         self.Ve0 = Ve0
         self.Vi0 = Vi0
@@ -74,7 +77,7 @@ class SynapticNeuron:
         self.excitatory_Vin = excitatory_Vin if excitatory_Vin is not None else Ve0
         self.inhibitory_Vin = inhibitory_Vin if inhibitory_Vin is not None else Vi0
 
-    def compute_derivatives(self):
+    def compute_derivatives(self, log_currents=True):
         """
         Se, Si corresponds to the probability of the synapse being open
         g_synapse = g_syn_e * Se OR g_syn_i * Si
@@ -96,8 +99,9 @@ class SynapticNeuron:
             - self.g_s*((self.Vs-self.Vs0)**2) \
             - self.g_us*((self.Vus-self.Vus0)**2) ) / self.cap
 
-        self.I_excitatory_values.append(I_excitatory)
-        self.I_inhibitory_values.append(I_inhibitory)
+        if log_currents:
+            self.I_excitatory_values.append(I_excitatory)
+            self.I_inhibitory_values.append(I_inhibitory)
 
         return dV, dVs, dVus, dSe, dSi
     
@@ -111,30 +115,52 @@ class SynapticNeuron:
 
     def update_state(self, dt):
         dV, dVs, dVus, dSe, dSi = self.compute_derivatives()
+        
+        # First calculate value of V_new 
         V_new = forward_euler(self.V, dt, dV)
-        Vs_new = forward_euler(self.Vs, dt, dVs)
-        Vus_new = forward_euler(self.Vus, dt, dVus)
-        Se_new = forward_euler(self.Se, dt, dSe)
-        Si_new = forward_euler(self.Si, dt, dSi)
 
         if V_new >= self.V_threshold:
+            # Set neuron voltage to fixed V_peak
+            self.V = self.V_peak
+
+            # Recompute new derivatives based on V=V_peak
+            dV_spike, dVs_spike, dVus_spike, dSe_spike, dSi_spike = self.compute_derivatives(log_currents=False)
+
+            # # Update values of Vs, Vus, Se, Si
+            Vs_new = forward_euler(self.Vs, dt, dVs_spike)
+            Vus_new = forward_euler(self.Vus, dt, dVus_spike)
+            Se_new = forward_euler(self.Se, dt, dSe_spike)
+            Si_new = forward_euler(self.Si, dt, dSi_spike)
+            
+            # Append peak value V_peak to Vvalues
+            self.Vvalues.append(self.V)
+
+            # Reset after spiking action
             self.V = self.V_reset
             self.Vs = self.Vs_reset
             self.Vus += self.delta_Vus
-            self.Se = np.zeros_like(self.excitatory_Vin)
-            self.Si = np.zeros_like(self.inhibitory_Vin)
+            # self.Se = np.zeros_like(self.excitatory_Vin)
+            # self.Si = np.zeros_like(self.inhibitory_Vin)
         else:
             self.V = V_new
+
+            Vs_new = forward_euler(self.Vs, dt, dVs)
+            Vus_new = forward_euler(self.Vus, dt, dVus)
+            Se_new = forward_euler(self.Se, dt, dSe)
+            Si_new = forward_euler(self.Si, dt, dSi)
+
             self.Vs = Vs_new
             self.Vus = Vus_new
             self.Se = Se_new
             self.Si = Si_new
 
-        self.Vvalues.append(self.V)
+            self.Vvalues.append(self.V)
+
         # self.Vsvalues.append(self.Vs)
         # self.Vusvalues.append(self.Vus)
         self.Sevalues.append(self.Se)
         self.Sivalues.append(self.Si)
+
 
     """
     def Vs_dot(self):
@@ -185,7 +211,7 @@ def gating_expeuler(t, z, dt, z_inf, tau_z):
     return t_ret, z_ret
 
 # Simulate the half-centre synapse model
-def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_array_A: list, I_ext_array_B: list, excit_ext_A, inhib_ext_A, excit_ext_B, inhib_ext_B, dt = 1e-4, runtime = 5.0, plotter=False):
+def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_array_A: list, I_ext_array_B: list, excit_ext_A, inhib_ext_A, excit_ext_B, inhib_ext_B, dt = 1e-4, runtime = 5.0, plotter=False, same_start=True):
 
     # excit_A = np.array(excit_ext_A)
     # excit_B = np.array(excit_ext_B)
@@ -202,7 +228,10 @@ def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_arr
     cnt = 0
 
     neuronA.V = neuronA.V0
-    neuronB.V = neuronB.V0 + 0.1
+    if same_start:
+        neuronB.V = neuronB.V0
+    else:
+        neuronB.V = neuronB.V0 + 0.1
 
     prev_VA = neuronA.V
     prev_VB = neuronB.V
@@ -214,6 +243,17 @@ def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_arr
         inhib_A = np.append(inhib_ext_A, prev_VB)
         inhib_B = np.append(inhib_ext_B, prev_VA)
         
+        # tempA = copy.deepcopy(neuronA)
+        # tempB = copy.deepcopy(neuronB)
+        # tempA.update_inputs(I_ext=I_ext_A, excitatory_Vin=excit_A, inhibitory_Vin=inhib_A)
+        # tempB.update_inputs(I_ext=I_ext_B, excitatory_Vin=excit_B, inhibitory_Vin=inhib_B)
+
+        # tempA.update_state(dt)
+        # tempB.update_state(dt)
+
+        # neuronA.V = tempA.V
+        # neuronB.V = tempB.V
+
 
         neuronA.update_inputs(I_ext=I_ext_A, excitatory_Vin=excit_A, inhibitory_Vin=inhib_A)
         neuronB.update_inputs(I_ext=I_ext_B, excitatory_Vin=excit_B, inhibitory_Vin=inhib_B)
@@ -230,7 +270,7 @@ def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_arr
         # cnt += 1
 
     if plotter:
-        fig, axs = plt.subplots(4,1, figsize=(10, 8))
+        fig, axs = plt.subplots(4,1, figsize=(12, 8))
 
         # axs[0, 0].plot(t_array, I_ext_array_A, color="tab:blue")
         # axs[0, 0].set_title("Neuron A I_ext Input")
@@ -243,28 +283,59 @@ def simulate_synapse(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_arr
         # axs[1, 0].set_ylabel("I_ext")
 
         axs[0].plot(t_array, neuronA.Vvalues, color="tab:green")
-        axs[0].set_title("Neuron A Voltage (V)")
+        axs[0].set_title("Neuron A Membrane Potential (V)")
         axs[0].set_xlabel("Time (s)")
         axs[0].set_ylabel("Voltage (mV)")
 
         axs[2].plot(t_array, neuronB.Vvalues, color="tab:red")
-        axs[2].set_title("Neuron B Voltage (V)")
+        axs[2].set_title("Neuron B Membrane Potential (V)")
         axs[2].set_xlabel("Time (s)")
         axs[2].set_ylabel("Voltage (mV)")
 
-        axs[1].plot(t_array, neuronA.Sivalues, color="tab:blue", label="Neuron A Inhibitory Synapse")
-        axs[1].set_title("Neuron A Inhibitory Synapse")
+        axs[1].plot(t_array, neuronA.Sivalues, color="tab:blue", label="Neuron A Si")
+        axs[1].set_title("Neuron A Si")
         axs[1].set_xlabel("Time (s)")
-        axs[1].set_ylabel("Synaptic State")
+        axs[1].set_ylabel("Synaptic Weight")
 
-        axs[3].plot(t_array, neuronB.Sivalues, color="tab:orange", label="Neuron B Inhibitory Synapse")
-        axs[3].set_title("Neuron B Inhibitory Synapse")
+        axs[3].plot(t_array, neuronB.Sivalues, color="tab:orange", label="Neuron B Si")
+        axs[3].set_title("Neuron B Si")
         axs[3].set_xlabel("Time (s)")
-        axs[3].set_ylabel("Synaptic State")
+        axs[3].set_ylabel("Synaptic Weight")
 
         plt.tight_layout()
-        plt.savefig(os.path.join(os.getcwd(),"NeuronModels/Synapse_Plots", f"synapse_{runtime}.png"))
+        fig.suptitle(f"Half Centre. VeA = {neuronA.Ve_threshold}, ViA = {neuronA.Vi_threshold}, VeB = {neuronB.Ve_threshold}, ViB = {neuronB.Vi_threshold}", fontsize=16)
+        plt.subplots_adjust(top=0.92)
+        # plt.savefig(os.path.join(os.getcwd(),"NeuronModels/Synapse_Plots", f"synapse_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}.png"))
         plt.show()
+
+        # # Sum over minor arrays for inhibitory values before plotting
+        # I_inh_A_sums = [np.sum(val) for val in neuronA.I_inhibitory_values]
+        # I_inh_B_sums = [np.sum(val) for val in neuronB.I_inhibitory_values]
+
+        # fig2, axs2 = plt.subplots(4, 1, figsize=(12, 8))
+
+        # axs2[0].plot(t_array, neuronA.Vvalues, color="tab:green")
+        # axs2[0].set_title("Neuron A Membrane Potential (V)")
+        # axs2[0].set_xlabel("Time (s)")
+        # axs2[0].set_ylabel("Voltage (mV)")
+
+        # axs2[1].plot(t_array, I_inh_A_sums, color="tab:blue")
+        # axs2[1].set_title("Neuron A I_inhibitory")
+        # axs2[1].set_xlabel("Time (s)")
+        # axs2[1].set_ylabel("I_inhibitory")
+
+        # axs2[2].plot(t_array, neuronB.Vvalues, color="tab:red")
+        # axs2[2].set_title("Neuron B Membrane Potential (V)")
+        # axs2[2].set_xlabel("Time (s)")
+        # axs2[2].set_ylabel("Voltage (mV)")
+
+        # axs2[3].plot(t_array, I_inh_B_sums, color="tab:orange")
+        # axs2[3].set_title("Neuron B I_inhibitory")
+        # axs2[3].set_xlabel("Time (s)")
+        # axs2[3].set_ylabel("I_inhibitory")
+
+        # plt.tight_layout()
+        # plt.show()
 
 
     # neuronA = SynapticNeuron(excitatory_Vin=VA_ext[0], inhibitory_Vin=np.array([VA_ext[1], VofB]))
@@ -281,26 +352,29 @@ def main():
     numsteps = int(runtime/dt)
     amplitude = 5
     current_ext = np.zeros(numsteps)
-    start_index = numsteps // 10
-    current_ext[start_index:] = amplitude
-    excit_ext_A = [-54]
-    inhib_ext_A = [-54]
-    excit_ext_B = [-54]
-    inhib_ext_B = [-54]
+    start_time = int(0.5/dt)
+    current_ext[start_time:] = amplitude
+    # excit_ext_A = [-54]
+    # inhib_ext_A = [-54]
+    # excit_ext_B = [-54]
+    # inhib_ext_B = [-54]
 
-    # excit_ext_A = []
-    # inhib_ext_A = []
-    # excit_ext_B = []  
-    # inhib_ext_B = []
+    excit_ext_A = []
+    inhib_ext_A = []
+    excit_ext_B = []  
+    inhib_ext_B = []
 
     plotter = True
+    same_start = False
 
     neuronA = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-20,)
     neuronB = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-30,)
     # neuronA = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-20, excitatory_Vin=excit_ext_A, inhibitory_Vin=inhib_ext_A)
     # neuronB = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-20, excitatory_Vin=excit_ext_B, inhibitory_Vin=inhib_ext_B)
 
-    simulate_synapse(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter)
+    simulate_synapse(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
+
+    # print(np.sum(neuronA.I_inhibitory_values))
 
 
 if __name__ == "__main__":
