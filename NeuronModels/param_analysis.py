@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import pickle
-from mqif_neuron import MQIFNeuron, single_simulation, detect_burst
+from mqif_neuron import MQIFNeuron as NEURON, single_simulation, detect_burst
+# from synaptic_neuron import SynapticNeuron as NEURON, simulate_neuron
+# from half_centre import simulate_halfcentre
 
 def calculate_interburst_frequency(interburst_interval):
     if len(interburst_interval) == 0:
@@ -63,7 +65,9 @@ def two_parameter_sweep(param1, p1values, param2, p2values, I_ext_array, dt=1e-4
 
         for p1 in range(len(p1values)):
             for p2 in range(len(p2values)):
-                neuron = MQIFNeuron()
+                # neuron = MQIFNeuron()
+                # neuron = SynapticNeuron()
+                neuron = NEURON()
                 # Reconfigure the neuron with the new parameters
                 if hasattr(neuron, param1) & hasattr(neuron, param2):
                     setattr(neuron, param1, p1values[p1])

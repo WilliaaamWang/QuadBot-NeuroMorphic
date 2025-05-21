@@ -7,6 +7,12 @@
 src/C
 src/Python
 src/testneuron1/Plots
+NeuronModels/t1.py
+NeuronModels/dum.py
+NeuronModels/SynapticNeuron_Plots/*
+NeuronModels/Halfcentre_Plots/*
+NeuronModels/gptcode.py
+NeuronModels/param_sweep/**
 
 # ========================
 # Simulink Embedded Coder
