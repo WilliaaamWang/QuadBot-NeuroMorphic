@@ -123,7 +123,7 @@ def simulate_halfcentre(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_
         fig.suptitle(f"Half Centre. Veth A = {neuronA.Ve_threshold}, Vith A = {neuronA.Vi_threshold}, Veth B = {neuronB.Ve_threshold}, Vith B = {neuronB.Vi_threshold}", fontsize=16)
         plt.subplots_adjust(top=0.92)
         plt.savefig(os.path.join(os.path.dirname(__file__),"Halfcentre_Plots", f"synapse_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}.png"))
-        plt.show()
+        # plt.show()
 
         # # Sum over minor arrays for inhibitory values before plotting
         # I_inh_A_sums = [np.sum(val) for val in neuronA.I_inhibitory_values]
@@ -190,8 +190,8 @@ def main():
     initial_excit = -52
     initial_inhib = -52
 
-    neuronA = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-20, Vi_threshold=-20,)
-    neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-20, Vi_threshold=-20,)
+    neuronA = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-20,)
+    neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-30,)
 
 
     simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
