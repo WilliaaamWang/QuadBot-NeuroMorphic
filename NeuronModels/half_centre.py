@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 # import copy
 
-from synapticNeuronClass import SynapticNeuron  # make sure synaptic_neuron.py is available in the same directory
+from .synaptic_neuron import SynapticNeuron  # make sure synaptic_neuron.py is available in the same directory
 
 # def sigmoid(x: np.array) -> np.array:
 #     result = 1 / (1 + np.exp(-x))
