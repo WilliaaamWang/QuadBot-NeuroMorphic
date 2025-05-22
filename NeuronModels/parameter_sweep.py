@@ -6,8 +6,8 @@ import pandas as pd
 import h5py
 import itertools
 from multiprocessing import Pool
-from synapticNeuronClass import SynapticNeuron
-from utils import extract_features
+from .synaptic_neuron import SynapticNeuron
+from .utils import extract_features
 import os
 
 # Define parameter ranges

@@ -2,7 +2,7 @@
 Generic network simulator for arbitrary connectivity.
 """
 import numpy as np
-from synapticNeuronClass import SynapticNeuron
+from .synaptic_neuron import SynapticNeuron
 
 
 def simulate_network(
