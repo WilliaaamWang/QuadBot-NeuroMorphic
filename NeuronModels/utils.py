@@ -6,7 +6,6 @@ from scipy.signal import find_peaks
 from scipy.stats import gaussian_kde
 
 def detect_spikes(trace, fs, threshold=-10.0, refractory_ms=2.0, prominence=5.0):
-    # same implementation as before
     refractory_samples = int(refractory_ms * 1e-3 * fs)
     peaks, props = find_peaks(
         trace,
@@ -16,47 +15,42 @@ def detect_spikes(trace, fs, threshold=-10.0, refractory_ms=2.0, prominence=5.0)
     )
     return peaks, props
 
-# import time
 
-def choose_isi_gap(t_spike):
-    """Return a data-driven burst gap (s) from the log-ISI histogram valley."""
-    # t0 = time.time()
-    isi = np.diff(t_spike)
-    log_isi = np.log10(isi)
-    xs = np.linspace(log_isi.min(), log_isi.max(), 1024)
-    kde = gaussian_kde(log_isi)(xs)
-    isi_gap = 10 ** xs[np.argmin(kde)]     # valley → threshold (s)
-    # t1 = time.time()
-    # time_diff = tend - t1
-    # print(f"Time taken to compute ISI gap: {time_diff:.4f} seconds")
-    return isi_gap
+# def choose_isi_gap(t_spike):
+#     """Return a data-driven burst gap (s) from the log-ISI histogram valley."""
+#     isi = np.diff(t_spike)
+#     log_isi = np.log10(isi)
+#     xs = np.linspace(log_isi.min(), log_isi.max(), 1024)
+#     kde = gaussian_kde(log_isi)(xs)
+#     isi_gap = 10 ** xs[np.argmin(kde)]     # valley → threshold (s)
+#     return isi_gap
 
-def split_into_bursts(t_spike, isi_gap=None):
-    isi = np.diff(t_spike)
-    if isi_gap is None:
-        isi_gap = choose_isi_gap(t_spike)
-    edges     = np.where(isi > isi_gap)[0]          # last spike of each burst
-    starts    = np.insert(edges+1, 0, 0)
-    stops     = np.append(edges, len(t_spike)-1)
-    bursts    = [t_spike[s:e+1] for s, e in zip(starts, stops)]
-    return bursts, isi_gap
+# def split_into_bursts(t_spike, isi_gap=None):
+#     isi = np.diff(t_spike)
+#     if isi_gap is None:
+#         isi_gap = choose_isi_gap(t_spike)
+#     edges     = np.where(isi > isi_gap)[0]          # last spike of each burst
+#     starts    = np.insert(edges+1, 0, 0)
+#     stops     = np.append(edges, len(t_spike)-1)
+#     bursts    = [t_spike[s:e+1] for s, e in zip(starts, stops)]
+#     return bursts, isi_gap
 
-def burst_metrics(bursts):
-    """Return spikes/burst, inter-burst frequency, intra-burst frequencies."""
-    # 3.1 spikes per burst
-    n_spikes_pb = np.array([len(b) for b in bursts])
+# def burst_metrics(bursts):
+#     """Return spikes/burst, inter-burst frequency, intra-burst frequencies."""
+#     # 3.1 spikes per burst
+#     n_spikes_pb = np.array([len(b) for b in bursts])
 
-    # 3.2 inter-burst freq: first-spike times → IBIs
-    t_burst   = np.array([b[0] for b in bursts])
-    ibi       = np.diff(t_burst)           # s
-    f_inter   = 1 / ibi                    # Hz
+#     # 3.2 inter-burst freq: first-spike times → IBIs
+#     t_burst   = np.array([b[0] for b in bursts])
+#     ibi       = np.diff(t_burst)           # s
+#     f_inter   = 1 / ibi                    # Hz
 
-    # 3.3 intra-burst freq: ISIs inside each burst
-    f_intra_lists = [1/np.diff(b) for b in bursts if len(b) > 1]
+#     # 3.3 intra-burst freq: ISIs inside each burst
+#     f_intra_lists = [1/np.diff(b) for b in bursts if len(b) > 1]
 
-    return dict(n_spikes_per_burst=n_spikes_pb,
-                inter_burst_freq=f_inter,
-                intra_burst_freq_lists=f_intra_lists)
+#     return dict(n_spikes_per_burst=n_spikes_pb,
+#                 inter_burst_freq=f_inter,
+#                 intra_burst_freq_lists=f_intra_lists)
 
 
 def extract_features(V_trace, dt):
@@ -67,27 +61,36 @@ def extract_features(V_trace, dt):
     mean_burst_duration, duty_cycle, regime
     """
     fs = 1.0 / dt
-    peaks, props = detect_spikes(V_trace, fs)
-    t_spike = peaks * dt
+    peaks, _ = detect_spikes(V_trace, fs)
+    features = {"peaks": peaks}
+
     spike_count = len(peaks)
-    features = {"spike_count": spike_count}
+    features["spike_count"] = spike_count
+
     if spike_count == 0:
         features.update({
             "regime": "quiescent",
             "mean_isi": np.nan,
             "cv_isi": np.nan,
             "n_bursts": 0,
-            "burst_freq": np.nan,
-            "mean_spikes_per_burst": 0,
-            "mean_burst_duration": 0,
+            "mean_spikes_per_burst": np.nan,
+            "mean_burst_duration": np.nan,
+            "interburst_freq": np.nan,
+            "intraburst_freq": np.nan,
             "duty_cycle": np.nan
         })
         return features
 
-    # Inter-spike intervals
+    t_spike = peaks * dt
+
+    # 1) Inter-spike intervals
     isi = np.diff(t_spike)
-    features["mean_isi"] = float(np.mean(isi))
-    features["cv_isi"] = float(np.std(isi) / np.mean(isi))
+    mean_isi = float(np.mean(isi))
+    cv_isi   = float(np.std(isi) / mean_isi)
+    features.update({
+        "mean_isi": mean_isi,
+        "cv_isi":   cv_isi
+    })
 
     # Simple burst splitting: threshold = mean_isi * 2
     isi_gap = features["mean_isi"] * 2
@@ -103,29 +106,75 @@ def extract_features(V_trace, dt):
 
     n_bursts = len(bursts)
     features["n_bursts"] = n_bursts
-    features["mean_spikes_per_burst"] = float(np.mean([len(b) for b in bursts]))
+    
+    #-----------------------------------------
+    # 2) choose data-driven ISI gap via KDE
+    # log_isi = np.log10(isi)
+    # xs = np.linspace(log_isi.min(), log_isi.max(), 1024)
+    # kde_vals = gaussian_kde(log_isi)(xs)
+    # isi_gap = 10 ** xs[np.argmin(kde_vals)]
+
+    # # 3) split into bursts
+    # edges  = np.where(isi > isi_gap)[0]
+    # starts = np.insert(edges + 1, 0, 0)
+    # stops  = np.append(edges, len(t_spike)-1)
+    # bursts2 = [t_spike[s:e+1] for s, e in zip(starts, stops)]
+
+    # n_bursts2 = len(bursts2)
+    # features["n_bursts2"] = n_bursts2
+
+
+    # 4) spikes per burst
+    spikes_per_burst = np.array([len(b) for b in bursts])
+    features["mean_spikes_per_burst"] = float(np.mean(spikes_per_burst))
+
+    # spikes_per_burst2 = np.array([len(b) for b in bursts2])
+    # features["mean_spikes_per_burst2"] = float(np.mean(spikes_per_burst2))
+
+    # 5) inter-burst frequencies (Hz)
+    t_burst = np.array([b[0] for b in bursts])
+    ibi     = np.diff(t_burst)  # inter-burst intervals in s
+    if len(ibi) > 0:
+        interburst_freq = float(np.mean(1.0 / ibi))
+    else:
+        interburst_freq = np.nan
+    features["interburst_freq"] = interburst_freq
+
+    # 6) intra-burst frequencies (Hz)
+    intra_lists = [1.0/np.diff(b) for b in bursts if len(b)>1]
+    if intra_lists:
+        all_intra = np.concatenate(intra_lists)
+        intraburst_freq = float(np.mean(all_intra))
+    else:
+        intraburst_freq = np.nan
+    features["intraburst_freq"] = intraburst_freq
+
+    # 7) duty cycle = mean(duration/period) across bursts
+    durations = np.array([b[-1] - b[0] for b in bursts])
+    if len(ibi) > 0:
+        ratios = durations[:-1] / ibi    # skip last burst (no next period)
+        duty_cycle = float(np.mean(ratios))
+    else:
+        duty_cycle = np.nan
+    features["duty_cycle"] = duty_cycle
 
     # Burst durations and periods
-    durations = [b[-1] - b[0] for b in bursts]
-    features["mean_burst_duration"] = float(np.mean(durations))
-    periods = []
-    for i in range(n_bursts - 1):
-        periods.append(bursts[i + 1][0] - bursts[i][0])
-    features["burst_freq"] = float(1.0 / np.mean(periods)) if periods else np.nan
-    features["duty_cycle"] = float(np.mean([d / p for d, p in zip(durations, periods)])) if periods else np.nan
+    # durations = [b[-1] - b[0] for b in bursts]
+    # features["mean_burst_duration"] = float(np.mean(durations))
+    # periods = []
+    # for i in range(n_bursts - 1):
+    #     periods.append(bursts[i + 1][0] - bursts[i][0])
+    # features["burst_freq"] = float(1.0 / np.mean(periods)) if periods else np.nan
+    # features["duty_cycle"] = float(np.mean([d / p for d, p in zip(durations, periods)])) if periods else np.nan
 
     # Regime classification
     if n_bursts > 1:
         features["regime"] = "bursting"
     else:
-        features["regime"] = "tonic"
+        features["regime"] = "tonic_spiking"
 
     return features
 
-
-def classify_regime(features):
-    """Return the regime string from extracted features dict."""
-    return features.get("regime", "unknown")
 
 
 # Fourier transform to analyse frequency content of membrane potential
@@ -154,33 +203,44 @@ def fft_membrane_potential(neuron, dt):
 if __name__ == "__main__":
     dt = 5e-5
     # Read membrane potential data in csv
-    csvpath = os.path.join(os.path.dirname(__file__), "SynapticNeuron_Plots/neuronV.csv")
+    csvpath = os.path.join(os.path.dirname(__file__), "SynapticNeuron_Plots", "Varying_20.0s_I[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].csv")
+    # csvpath = os.path.join(os.path.dirname(__file__), "SynapticNeuron_Plots", "neuronV.csv")
     data = pd.read_csv(csvpath)
-    time_axis = data.iloc[:, 0].values
-    Vvalues = data.iloc[:, 1].values
-    # time_axis = np.arange(0, len(Vvalues) * dt, dt)
+    time_axis = data["time"].values
+    Ivalues = data["I_ext"].values
+    Vvalues = data["V"].values
 
-    peaks, t_spike = detect_spikes(Vvalues, fs=1000, threshold=-10.0, refractory_ms=2.0, prominence=5.0)
-
-    fig, axs = plt.subplots(2, 1, figsize=(12, 6))
-    axs[0].plot(time_axis, Vvalues, label="Membrane Potential")
-    axs[0].plot(time_axis[peaks], Vvalues[peaks], "x", label="Detected Spikes", color='red')
-
-    isi_gap = choose_isi_gap(t_spike)
-    bursts, isi_gap = split_into_bursts(t_spike, isi_gap=isi_gap)
-    burst_metrics_data = burst_metrics(bursts)
-    print(f"ISI gap: {isi_gap:.4f} s")
-    print(f"Spikes per burst: {burst_metrics_data['n_spikes_per_burst']}")
-    print(f"Inter-burst frequency: {burst_metrics_data['inter_burst_freq']}")
-    print(f"Intra-burst frequencies: {burst_metrics_data['intra_burst_freq_lists']}")
+    
+    features = extract_features(Vvalues, dt)
+    peaks = features["peaks"]
+    print(f"Regime: {features['regime']}")
+    print(f"Spike count: {features['spike_count']}")
+    print(f"Mean ISI: {features['mean_isi']:.4f} s")
+    print(f"CV ISI: {features['cv_isi']:.4f}")
+    print(f"Number of bursts: {features['n_bursts']}")
+    # print(f"Number of bursts (KDE): {features['n_bursts2']}")
+    print(f"Mean spikes per burst: {features['mean_spikes_per_burst']:.4f}")
+    # print(f"Mean spikes per burst 2: {features['mean_spikes_per_burst2']:.4f}")
+    print(f"Mean burst duration: {features['mean_burst_duration']:.4f} s")
+    print(f"Duty cycle: {features['duty_cycle']:.4f}")
+    # print(f"Duty cycle 2: {features['duty_cycle2']:.4f}")
+    # print(f"Burst frequency: {features['burst_freq']:.4f} Hz")
+    print(f"Interburst frequency: {features['interburst_freq']:.4f} Hz")
+    print(f"Intraburst frequency: {features['intraburst_freq']:.4f} Hz")
     
 
-    # for burst in bursts:
-    #     axs[1].plot(burst, Vvalues[peaks][np.isin(peaks, burst)], "o", label="Burst", color='orange')
-    # axs[1].set_title("Detected Spikes and Bursts")
-    # axs[1].set_xlabel("Time (s)")
-    # axs[1].set_ylabel("Membrane Potential (mV)")
-    # axs[1].legend()
-    plt.grid(True)
-
+    # Plot applied current & membrane potential with detected spikes in shared time axis
+    fig, axs = plt.subplots(2, 1, figsize=(12, 6))
+    axs[0].plot(time_axis, Ivalues, label="Applied Current (I_ext)", color='orange')
+    axs[0].set_ylabel("Current (nA)")
+    axs[0].set_title("Applied Current and Membrane Potential")
+    axs[0].legend()
+    axs[0].grid(True)
+    axs[1].plot(time_axis, Vvalues, label="Membrane Potential (V)", color='blue')
+    axs[1].plot(time_axis[peaks], Vvalues[peaks], "x", label="Detected Spikes", color='red')
+    axs[1].set_xlabel("Time (s)")
+    axs[1].set_ylabel("Membrane Potential (mV)")
+    axs[1].legend()
+    axs[1].grid(True)
+    plt.tight_layout()
     plt.show()

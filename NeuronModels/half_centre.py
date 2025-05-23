@@ -1,17 +1,18 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import os
+
+from utils import extract_features, detect_spikes
 # import copy
 
-from .synaptic_neuron import SynapticNeuron  # make sure synaptic_neuron.py is available in the same directory
+if __package__ is None or __package__ == "":
+    import os, sys
+    sys.path.append(os.path.dirname(__file__))
+    from synaptic_neuron import SynapticNeuron
+else:
+    from .synaptic_neuron import SynapticNeuron
 
-# def sigmoid(x: np.array) -> np.array:
-#     result = 1 / (1 + np.exp(-x))
-#     return result
-
-# def forward_euler(y, dt, dydt):
-#     y_ret = y + dydt*dt
-#     return y_ret
 
 # Exponential Euler Integration FOR GATING VARIABLES
 def gating_expeuler(t, z, dt, z_inf, tau_z):
@@ -122,7 +123,7 @@ def simulate_halfcentre(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_
         plt.tight_layout()
         fig.suptitle(f"Half Centre. Veth A = {neuronA.Ve_threshold}, Vith A = {neuronA.Vi_threshold}, Veth B = {neuronB.Ve_threshold}, Vith B = {neuronB.Vi_threshold}", fontsize=16)
         plt.subplots_adjust(top=0.92)
-        plt.savefig(os.path.join(os.path.dirname(__file__),"Halfcentre_Plots", f"synapse_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}.png"))
+        plt.savefig(os.path.join(os.path.dirname(__file__),"Halfcentre_Plots", f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}.png"))
         # plt.show()
 
         # # Sum over minor arrays for inhibitory values before plotting
@@ -160,9 +161,89 @@ def simulate_halfcentre(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_
     # neuronA = SynapticNeuron(excitatory_Vin=VA_ext[0], inhibitory_Vin=np.array([VA_ext[1], VofB]))
     # neuronB = SynapticNeuron(excitatory_Vin=VB_ext[0], inhibitory_Vin=np.array([VB_ext[1], VofA]))
 
-# def simulate_neurons(current_ext, dt, time):
-#     neuronA = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-20, excitatory_Vin=excit_ext_A, inhibitory_Vin=inhib_ext_A)
-#     neuronB = SynapticNeuron(Ve_threshold=-20, Vi_threshold=-20, excitatory_Vin=excit_ext_B, inhibitory_Vin=inhib_ext_B)
+
+def save_hc_data(neuronA, neuronB, dt, filename):
+    """
+    Save neuron data to a CSV file.
+    """
+    data = {
+        "Time": np.arange(len(neuronA.Vvalues)) * dt,
+        "Neuron A V": neuronA.Vvalues,
+        "Neuron B V": neuronB.Vvalues,
+        # "Neuron A Se": neuronA.Se,
+        # "Neuron B Se": neuronB.Se,
+        # "Neuron A Si": neuronA.Si,
+        # "Neuron B Si": neuronB.Si
+    }
+    df = pd.DataFrame(data)
+    df.to_csv(filename, index=False)
+
+# Analyse simulated half-centre features from saved csv data
+def analyse_hc_features(dt, filename):
+    """
+    Analyse features of the half-centre model from a CSV file.
+    """
+    data = pd.read_csv(filename)
+    time_axis = data["Time"].values
+    neuronA_V = data["Neuron A V"].values
+    neuronB_V = data["Neuron B V"].values
+
+    # Extract all features from the neurons
+    features_A = extract_features(neuronA_V, dt)
+    features_B = extract_features(neuronB_V, dt)
+
+    peaks_A = features_A["peaks"]
+    peaks_B = features_B["peaks"]
+    print(f"Neuron A: {features_A['regime']}")
+    print(f"Neuron B: {features_B['regime']}")
+    print(f"Neuron A: {features_A['spike_count']}")
+    print(f"Neuron B: {features_B['spike_count']}")
+    print(f"Neuron A: {features_A['mean_isi']:.4f} s")
+    print(f"Neuron B: {features_B['mean_isi']:.4f} s")
+    print(f"Neuron A: {features_A['cv_isi']:.4f}")
+    print(f"Neuron B: {features_B['cv_isi']:.4f}")
+    print(f"Neuron A: {features_A['n_bursts']}")
+    print(f"Neuron B: {features_B['n_bursts']}")
+    # print(f"Neuron A: {features_A['burst_freq']:.4f} Hz")
+    # print(f"Neuron B: {features_B['burst_freq']:.4f} Hz")
+    print(f"Neuron A: {features_A['mean_spikes_per_burst']:.4f}")
+    print(f"Neuron B: {features_B['mean_spikes_per_burst']:.4f}")
+    print(f"Neuron A: {features_A['mean_burst_duration']:.4f} s")
+    print(f"Neuron B: {features_B['mean_burst_duration']:.4f} s")
+    print(f"Neuron A: {features_A['duty_cycle']:.4f}")
+    print(f"Neuron B: {features_B['duty_cycle']:.4f}")
+    print(f"Neuron A: {features_A['interburst_freq']:.4f}")
+    print(f"Neuron B: {features_B['interburst_freq']:.4f}")
+    print(f"Neuron A: {features_A['intra_burst_freq']}")
+    print(f"Neuron B: {features_B['intra_burst_freq']}")
+
+
+    # Detect spikes
+    # peaks_A, t_spike_A = detect_spikes(neuronA_V, fs=1/dt, threshold=-10.0, refractory_ms=2.0, prominence=5.0)
+    # peaks_B, t_spike_B = detect_spikes(neuronB_V, fs=1/dt, threshold=-10.0, refractory_ms=2.0, prominence=5.0)
+
+    # # Split into bursts
+    # isi_gap_A = choose_isi_gap(t_spike_A)
+    # isi_gap_B = choose_isi_gap(t_spike_B)
+    
+    # bursts_A, isi_gap_A = split_into_bursts(t_spike_A, isi_gap=isi_gap_A)
+    # bursts_B, isi_gap_B = split_into_bursts(t_spike_B, isi_gap=isi_gap_B)
+
+    # # Calculate burst metrics
+    # burst_metrics_data_A = burst_metrics(bursts_A)
+    # burst_metrics_data_B = burst_metrics(bursts_B)
+
+    # print(f"ISI gap A: {isi_gap_A:.4f} s")
+    # print(f"ISI gap B: {isi_gap_B:.4f} s")
+    
+    # print(f"Spikes per burst A: {burst_metrics_data_A['n_spikes_per_burst']}")
+    # print(f"Spikes per burst B: {burst_metrics_data_B['n_spikes_per_burst']}")
+    
+    # print(f"Inter-burst frequency A: {burst_metrics_data_A['inter_burst_freq']}")
+    # print(f"Inter-burst frequency B: {burst_metrics_data_B['inter_burst_freq']}")
+    
+    # print(f"Intra-burst frequencies A: {burst_metrics_data_A['intra_burst_freq_lists']}")
+    # print(f"Intra-burst frequencies B: {burst_metrics_data_B['intra_burst_freq_lists']}")
 
 def main():
     dt = 5e-5
@@ -194,20 +275,23 @@ def main():
     neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-30,)
 
 
-    simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
+    neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
 
-    # print(np.sum(neuronA.I_inhibitory_values))
 
     # Save neurons' Vvalues to csv
     csv_dir = os.path.join(os.path.dirname(__file__), "Halfcentre_Plots")
+
     if not os.path.exists(csv_dir):
         os.makedirs(csv_dir)
-    neuronA_csv = os.path.join(csv_dir, f"neuronA_{runtime}s_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_I={amplitude}.csv")
-    neuronB_csv = os.path.join(csv_dir, f"neuronB_{runtime}s_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_I={amplitude}.csv")
-    np.savetxt(neuronA_csv, neuronA.Vvalues, delimiter=",")
-    np.savetxt(neuronB_csv, neuronB.Vvalues, delimiter=",")
-
+    filename = os.path.join(csv_dir, f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_I={amplitude}.csv")
+    
+    # # Save neuron data to CSV
+    save_hc_data(neuronA, neuronB, dt, filename)
 
 if __name__ == "__main__":
     main()
+    # Analyse features from saved data
+    # csvname = "halfcentre_10.0_-50_-20_-50_-30"
+    # filename = os.path.join(csv_dir, csvname + ".csv")
+    # analyse_hc_features(dt, filename)
     
