@@ -74,7 +74,7 @@ def extract_features(V_trace, dt):
             "cv_isi": np.nan,
             "n_bursts": 0,
             "mean_spikes_per_burst": np.nan,
-            "mean_burst_duration": np.nan,
+            # "mean_burst_duration": np.nan,
             "interburst_freq": np.nan,
             "intraburst_freq": np.nan,
             "duty_cycle": np.nan
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # print(f"Number of bursts (KDE): {features['n_bursts2']}")
     print(f"Mean spikes per burst: {features['mean_spikes_per_burst']:.4f}")
     # print(f"Mean spikes per burst 2: {features['mean_spikes_per_burst2']:.4f}")
-    print(f"Mean burst duration: {features['mean_burst_duration']:.4f} s")
+    # print(f"Mean burst duration: {features['mean_burst_duration']:.4f} s")
     print(f"Duty cycle: {features['duty_cycle']:.4f}")
     # print(f"Duty cycle 2: {features['duty_cycle2']:.4f}")
     # print(f"Burst frequency: {features['burst_freq']:.4f} Hz")

@@ -192,30 +192,37 @@ def analyse_hc_features(dt, filename):
     features_A = extract_features(neuronA_V, dt)
     features_B = extract_features(neuronB_V, dt)
 
+    # Save features to CSV
+    features_A_df = pd.DataFrame(features_A)
+    features_B_df = pd.DataFrame(features_B)
+    features_A_df.to_csv(filename.replace(".csv", "_A_features.csv"), index=False)
+    features_B_df.to_csv(filename.replace(".csv", "_B_features.csv"), index=False)
+
+    # Print features
     peaks_A = features_A["peaks"]
     peaks_B = features_B["peaks"]
-    print(f"Neuron A: {features_A['regime']}")
-    print(f"Neuron B: {features_B['regime']}")
-    print(f"Neuron A: {features_A['spike_count']}")
-    print(f"Neuron B: {features_B['spike_count']}")
-    print(f"Neuron A: {features_A['mean_isi']:.4f} s")
-    print(f"Neuron B: {features_B['mean_isi']:.4f} s")
-    print(f"Neuron A: {features_A['cv_isi']:.4f}")
-    print(f"Neuron B: {features_B['cv_isi']:.4f}")
-    print(f"Neuron A: {features_A['n_bursts']}")
-    print(f"Neuron B: {features_B['n_bursts']}")
+    print(f"Neuron A Regime: {features_A['regime']}")
+    print(f"Neuron B Regime: {features_B['regime']}")
+    print(f"Neuron A Spike count: {features_A['spike_count']}")
+    print(f"Neuron B Spike count: {features_B['spike_count']}")
+    print(f"Neuron A Mean ISI: {features_A['mean_isi']:.4f} s")
+    print(f"Neuron B Mean ISI: {features_B['mean_isi']:.4f} s")
+    print(f"Neuron A CV ISI: {features_A['cv_isi']:.4f}")
+    print(f"Neuron B CV ISI: {features_B['cv_isi']:.4f}")
+    print(f"Neuron A Number of bursts: {features_A['n_bursts']}")
+    print(f"Neuron B Number of bursts: {features_B['n_bursts']}")
     # print(f"Neuron A: {features_A['burst_freq']:.4f} Hz")
     # print(f"Neuron B: {features_B['burst_freq']:.4f} Hz")
-    print(f"Neuron A: {features_A['mean_spikes_per_burst']:.4f}")
-    print(f"Neuron B: {features_B['mean_spikes_per_burst']:.4f}")
-    print(f"Neuron A: {features_A['mean_burst_duration']:.4f} s")
-    print(f"Neuron B: {features_B['mean_burst_duration']:.4f} s")
-    print(f"Neuron A: {features_A['duty_cycle']:.4f}")
-    print(f"Neuron B: {features_B['duty_cycle']:.4f}")
-    print(f"Neuron A: {features_A['interburst_freq']:.4f}")
-    print(f"Neuron B: {features_B['interburst_freq']:.4f}")
-    print(f"Neuron A: {features_A['intra_burst_freq']}")
-    print(f"Neuron B: {features_B['intra_burst_freq']}")
+    print(f"Neuron A Mean spikes per burst: {features_A['mean_spikes_per_burst']:.4f}")
+    print(f"Neuron B Mean spikes per burst: {features_B['mean_spikes_per_burst']:.4f}")
+    # print(f"Neuron A: {features_A['mean_burst_duration']:.4f} s")
+    # print(f"Neuron B: {features_B['mean_burst_duration']:.4f} s")
+    print(f"Neuron A Duty cycle: {features_A['duty_cycle']:.4f}")
+    print(f"Neuron B Duty cycle: {features_B['duty_cycle']:.4f}")
+    print(f"Neuron A Interburst frequency: {features_A['interburst_freq']:.4f}")
+    print(f"Neuron B Interburst frequency: {features_B['interburst_freq']:.4f}")
+    print(f"Neuron A Intraburst frequency: {features_A['intraburst_freq']}")
+    print(f"Neuron B Intraburst frequency: {features_B['intraburst_freq']}")
 
 
     # Detect spikes
@@ -275,7 +282,7 @@ def main():
     neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-30,)
 
 
-    neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
+    # neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
 
 
     # Save neurons' Vvalues to csv
@@ -286,12 +293,13 @@ def main():
     filename = os.path.join(csv_dir, f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_I={amplitude}.csv")
     
     # # Save neuron data to CSV
-    save_hc_data(neuronA, neuronB, dt, filename)
+    # save_hc_data(neuronA, neuronB, dt, filename)
+
+    # Analyse features from saved data
+    csvname = "halfcentre_10.0_-50_-20_-50_-30_I=5"
+    filename = os.path.join(csv_dir, csvname + ".csv")
+    analyse_hc_features(dt, filename)
 
 if __name__ == "__main__":
     main()
-    # Analyse features from saved data
-    # csvname = "halfcentre_10.0_-50_-20_-50_-30"
-    # filename = os.path.join(csv_dir, csvname + ".csv")
-    # analyse_hc_features(dt, filename)
     
