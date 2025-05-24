@@ -13,8 +13,18 @@ src/testneuron1/Plots
 NeuronModels/Halfcentre_Plots/*
 !NeuronModels/Halfcentre_Plots/.gitkeep
 
-NeuronModels/hc_sweep/**
-!NeuronModels/hc_sweep/**/.gitkeep
+NeuronModels/hc_sweep/data/*
+!NeuronModels/hc_sweep/data/.gitkeep
+
+NeuronModels/hc_sweep/multi_param/*
+!NeuronModels/hc_sweep/multi_param/.gitkeep
+
+NeuronModels/hc_sweep/plots/*
+!NeuronModels/hc_sweep/plots/.gitkeep
+!NeuronModels/hc_sweep/plots/traces/
+
+NeuronModels/hc_sweep/plots/traces/*
+!NeuronModels/hc_sweep/plots/traces/.gitkeep
 
 NeuronModels/param_sweep/*
 !NeuronModels/param_sweep/.gitkeep
