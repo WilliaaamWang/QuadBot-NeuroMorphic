@@ -92,7 +92,7 @@ def extract_features(V_trace, dt):
         "cv_isi":   cv_isi
     })
 
-    # Simple burst splitting: threshold = mean_isi * 2
+    # 2) Simple burst splitting: threshold = mean_isi * 2
     isi_gap = features["mean_isi"] * 2
     bursts = []
     current = [t_spike[0]]
@@ -104,10 +104,11 @@ def extract_features(V_trace, dt):
             current = [t_next]
     bursts.append(current)
 
+    # 3) Number of bursts
     n_bursts = len(bursts)
     features["n_bursts"] = n_bursts
     
-    #-----------------------------------------
+    """
     # 2) choose data-driven ISI gap via KDE
     # log_isi = np.log10(isi)
     # xs = np.linspace(log_isi.min(), log_isi.max(), 1024)
@@ -122,6 +123,7 @@ def extract_features(V_trace, dt):
 
     # n_bursts2 = len(bursts2)
     # features["n_bursts2"] = n_bursts2
+    """
 
 
     # 4) spikes per burst

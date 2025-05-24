@@ -2,7 +2,12 @@
 Generic network simulator for arbitrary connectivity.
 """
 import numpy as np
-from .synaptic_neuron import SynapticNeuron
+if __package__ is None or __package__ == "":
+    import os, sys
+    sys.path.append(os.path.dirname(__file__))
+    from synaptic_neuron import SynapticNeuron
+else:
+    from .synaptic_neuron import SynapticNeuron
 
 
 def simulate_network(

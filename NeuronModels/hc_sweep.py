@@ -33,6 +33,13 @@ except ImportError:
     torch = None
     print("PyTorch not available, using CPU only")
 
+# Ask for confirmation before running on GPU
+if HAS_TORCH:
+    confirm = input("Running on GPU may be faster. Do you want to proceed? (y/n): ")
+    if confirm.lower() != 'y':
+        HAS_TORCH = False
+        print("Proceeding with CPU only.")
+
 # Import your modules
 from synaptic_neuron import SynapticNeuron
 from half_centre import simulate_halfcentre 
@@ -77,7 +84,7 @@ PARAM_GROUPS = {
 
 # Simulation parameters
 DT = 5e-5
-RUNTIME = 5.0  # seconds
+RUNTIME = 10.0  # seconds
 I_EXT_AMPLITUDE = 5.0
 I_EXT_START = 0.5  # seconds
 
