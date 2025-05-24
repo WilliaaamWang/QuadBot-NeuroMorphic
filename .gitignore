@@ -7,12 +7,24 @@
 src/C
 src/Python
 src/testneuron1/Plots
+
+
 # Ignore all contents under NeuronModels subdirectories recursively
-NeuronModels/**/
-# But keep the Python files in NeuronModels
-!NeuronModels/*.py
-# Keep empty directories by ignoring everything but keeping .gitkeep files if they exist
-!NeuronModels/**/.gitkeep
+NeuronModels/Halfcentre_Plots/*
+!NeuronModels/Halfcentre_Plots/.gitkeep
+
+NeuronModels/hc_sweep/**
+!NeuronModels/hc_sweep/**/.gitkeep
+
+NeuronModels/param_sweep/*
+!NeuronModels/param_sweep/.gitkeep
+
+NeuronModels/SynapticNeuron_Plots/*
+!NeuronModels/SynapticNeuron_Plots/.gitkeep
+
+NeuronModels/MQIF_sweep/*
+!NeuronModels/MQIF_sweep/.gitkeep
+
 NeuronModels/t1.py
 NeuronModels/dum.py
 NeuronModels/gptcode.py
