@@ -22,19 +22,20 @@ try:
     HAS_JOBLIB = True
 except ImportError:
     HAS_JOBLIB = False
-    print("Warning: joblib not available, will use serial processing")
+    print("▶︎ [INFO] joblib not available — will run sweeps serially on CPU")
 
 try:
     import torch
     HAS_TORCH = torch.cuda.is_available()
     if HAS_TORCH:
-        print(f"CUDA available! Using GPU: {torch.cuda.get_device_name()}")
+        _GPU_NAME = torch.cuda.get_device_name(0)
+        print(f"▶︎ [INFO] PyTorch sees CUDA — default device: {_GPU_NAME}")
     else:
-        print("PyTorch available but no CUDA support")
+        print("▶︎ [INFO] PyTorch present but **NO** CUDA device visible — CPU only")
 except ImportError:
     HAS_TORCH = False
     torch = None
-    print("PyTorch not available, using CPU only")
+    print("▶︎ [INFO] PyTorch not installed — CPU only build will be used")
 
 # Ask for confirmation before running on GPU
 if HAS_TORCH:
@@ -445,6 +446,7 @@ def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: di
     
 #     return df
 
+
 def single_param_sweep(param_name, param_values, dirs):
     """Sweep a *single* parameter and now save a voltage‑trace PNG for **every**
     simulation run (was previously just three)."""
@@ -465,9 +467,11 @@ def single_param_sweep(param_name, param_values, dirs):
             batch = param_combos[i:i+batch_size]
             gpu_feats = run_gpu_batch(batch) or []
             if gpu_feats:
+                print(f"Batch {i//batch_size + 1} processed on GPU, {len(gpu_feats)} results.")
                 results.extend(gpu_feats)
             else:  # fallback – run on CPU one‑by‑one with traces
                 for combo in batch:
+                    print(f"Running fallback CPU simulation for {combo[param_name]:.3f}...")
                     res = run_single_simulation(combo, save_trace=True)
                     results.append(res)
             # In *any* case, generate traces PNGs on CPU so we have plots
