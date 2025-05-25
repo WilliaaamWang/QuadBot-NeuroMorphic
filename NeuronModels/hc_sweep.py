@@ -116,6 +116,12 @@ def generate_param_ranges(n_samples: int = NUM_SAMPLES,
 # Instantiate ranges for sweeps ------------------------------------------------
 PARAM_RANGES = generate_param_ranges()
 
+print("▶︎ [INFO] Parameter ranges generated:")
+for param, values in PARAM_RANGES.items():
+    print(f"  {param}: {len(values)} samples, "
+          f"mean={np.mean(values):.3f}, "
+          f"std={np.std(values):.3f}")
+
 # Parameter groups for combined sweeps
 PARAM_GROUPS = {
     'resting_potentials': ['Vs0', 'Vus0'],
@@ -227,6 +233,7 @@ def run_gpu_batch(param_combinations):
     if not HAS_TORCH:
         return None
     
+    print(f"▶︎ [GPU]   launching batch of {len(param_combinations)} sims on CUDA …")
     device = torch.device('cuda')
     n_sims = len(param_combinations)
     n_steps = int(RUNTIME / DT)
@@ -463,6 +470,8 @@ def single_param_sweep(param_name, param_values, dirs):
     if use_gpu_batches:
         # GPU for features – then CPU rerun for traces so we still get PNGs
         batch_size = 200
+
+        print("▶︎ [GPU]   using run_gpu_batch() for feature extraction …")
         for i in tqdm(range(0, len(param_combos), batch_size), desc="GPU batches"):
             batch = param_combos[i:i+batch_size]
             gpu_feats = run_gpu_batch(batch) or []
@@ -480,6 +489,8 @@ def single_param_sweep(param_name, param_values, dirs):
                 trace_res = run_single_simulation(combo, save_trace=True)
                 _plot_voltage_trace(trace_res, param_name, label, dirs)
     else:
+        cpu_mode = "joblib‑parallel" if HAS_JOBLIB else "serial"
+        print(f"▶︎ [CPU]   executing in {cpu_mode} mode …")
         # CPU route (parallel if joblib is available)
         if HAS_JOBLIB:
             from joblib import Parallel, delayed
@@ -562,7 +573,7 @@ def plot_single_param_results(df, param_name, param_values, dirs):
 
 def multi_param_sweep(group_name, param_names, dirs):
     """Sweep multiple parameters together."""
-    print(f"\nSweeping parameter group: {group_name} ({param_names})...")
+    print(f"\n――― Multi‑parameter sweep: {group_name}  ({len(param_names)} dims) ―――")
     
     # Create all combinations
     param_values = [PARAM_RANGES[p] for p in param_names]
