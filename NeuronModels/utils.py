@@ -53,12 +53,28 @@ def detect_spikes(trace, fs, threshold=-10.0, refractory_ms=2.0, prominence=5.0)
 #                 intra_burst_freq_lists=f_intra_lists)
 
 
-def extract_features(V_trace, dt):
-    """
-    Compute spike/burst features from a voltage trace.
-    Returns a dict with keys: spike_count, mean_isi, cv_isi,
-    n_bursts, burst_freq, mean_spikes_per_burst,
-    mean_burst_duration, duty_cycle, regime
+def extract_features(V_trace, dt, skip_bursts: int = 0, window_bursts: int | None = None):
+    """Compute spike/burst features from a voltage trace.
+
+    Parameters
+    ----------
+    V_trace : array_like
+        Membrane potential trace.
+    dt : float
+        Simulation time step (s).
+    skip_bursts : int, optional
+        Number of initial bursts to discard when computing burst related
+        features.  This allows ignoring initial transients.  Default is 0.
+    window_bursts : int or None, optional
+        If given, only this many bursts after ``skip_bursts`` are used for the
+        feature calculations.  When ``None`` (default) the remainder of the
+        trace is used.
+
+    Returns
+    -------
+    dict
+        Dictionary containing spike and burst statistics such as
+        ``mean_spikes_per_burst`` and ``duty_cycle``.
     """
     fs = 1.0 / dt
     peaks, _ = detect_spikes(V_trace, fs)
@@ -83,28 +99,37 @@ def extract_features(V_trace, dt):
 
     t_spike = peaks * dt
 
-    # 1) Inter-spike intervals
+    # 1) Inter-spike intervals for determining burst gap
     isi = np.diff(t_spike)
-    mean_isi = float(np.mean(isi))
-    cv_isi   = float(np.std(isi) / mean_isi)
+    if len(isi) > 0:
+        mean_isi = float(np.mean(isi))
+        cv_isi   = float(np.std(isi) / mean_isi)
+    else:
+        mean_isi = np.nan
+        cv_isi   = np.nan
     features.update({
         "mean_isi": mean_isi,
         "cv_isi":   cv_isi
     })
 
     # 2) Simple burst splitting: threshold = mean_isi * 2
-    isi_gap = features["mean_isi"] * 2
+    isi_gap = features["mean_isi"] * 2 if not np.isnan(features["mean_isi"]) else 0.0
     bursts = []
-    current = [t_spike[0]]
-    for dt_isi, t_next in zip(isi, t_spike[1:]):
-        if dt_isi <= isi_gap:
-            current.append(t_next)
-        else:
-            bursts.append(current)
-            current = [t_next]
-    bursts.append(current)
+    if len(t_spike) > 0:
+        current = [t_spike[0]]
+        for dt_isi, t_next in zip(isi, t_spike[1:]):
+            if dt_isi <= isi_gap:
+                current.append(t_next)
+            else:
+                bursts.append(current)
+                current = [t_next]
+        bursts.append(current)
 
-    # 3) Number of bursts
+    # 3) Apply skip/window to select bursts for analysis
+    bursts = bursts[skip_bursts:]
+    if window_bursts is not None:
+        bursts = bursts[:window_bursts]
+
     n_bursts = len(bursts)
     features["n_bursts"] = n_bursts
     
@@ -127,19 +152,26 @@ def extract_features(V_trace, dt):
 
 
     # 4) spikes per burst
-    spikes_per_burst = np.array([len(b) for b in bursts])
-    features["mean_spikes_per_burst"] = float(np.mean(spikes_per_burst))
+    if n_bursts > 0:
+        spikes_per_burst = np.array([len(b) for b in bursts])
+        features["mean_spikes_per_burst"] = float(np.mean(spikes_per_burst))
+    else:
+        features["mean_spikes_per_burst"] = np.nan
 
     # spikes_per_burst2 = np.array([len(b) for b in bursts2])
     # features["mean_spikes_per_burst2"] = float(np.mean(spikes_per_burst2))
 
     # 5) inter-burst frequencies (Hz)
-    t_burst = np.array([b[0] for b in bursts])
-    ibi     = np.diff(t_burst)  # inter-burst intervals in s
-    if len(ibi) > 0:
-        interburst_freq = float(np.mean(1.0 / ibi))
+    if n_bursts > 0:
+        t_burst = np.array([b[0] for b in bursts])
+        ibi     = np.diff(t_burst)  # inter-burst intervals in s
+        if len(ibi) > 0:
+            interburst_freq = float(np.mean(1.0 / ibi))
+        else:
+            interburst_freq = np.nan
     else:
         interburst_freq = np.nan
+        ibi = []
     features["interburst_freq"] = interburst_freq
 
     # 6) intra-burst frequencies (Hz)
@@ -152,10 +184,13 @@ def extract_features(V_trace, dt):
     features["intraburst_freq"] = intraburst_freq
 
     # 7) duty cycle = mean(duration/period) across bursts
-    durations = np.array([b[-1] - b[0] for b in bursts])
-    if len(ibi) > 0:
-        ratios = durations[:-1] / ibi    # skip last burst (no next period)
-        duty_cycle = float(np.mean(ratios))
+    if n_bursts > 0:
+        durations = np.array([b[-1] - b[0] for b in bursts])
+        if len(ibi) > 0:
+            ratios = durations[:-1] / ibi    # skip last burst (no next period)
+            duty_cycle = float(np.mean(ratios))
+        else:
+            duty_cycle = np.nan
     else:
         duty_cycle = np.nan
     features["duty_cycle"] = duty_cycle
@@ -169,7 +204,7 @@ def extract_features(V_trace, dt):
     # features["burst_freq"] = float(1.0 / np.mean(periods)) if periods else np.nan
     # features["duty_cycle"] = float(np.mean([d / p for d, p in zip(durations, periods)])) if periods else np.nan
 
-    # Regime classification
+    # Regime classification based on selected bursts
     if n_bursts > 1:
         features["regime"] = "bursting"
     else:

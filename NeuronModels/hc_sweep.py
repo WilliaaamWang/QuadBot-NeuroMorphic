@@ -41,7 +41,12 @@ if HAS_TORCH:
     confirm = input("Running on GPU may be faster. Do you want to proceed? (y/n): ")
     if confirm.lower() != 'y':
         HAS_TORCH = False
+        confirm = input("Proceed with CPU only? (y/n): ")
+        if confirm.lower() != 'y':
+            print("Exiting without running simulations.")
+            exit(0)
         print("Proceeding with CPU only.")
+        
 
 # Import your modules
 from synaptic_neuron import SynapticNeuron
@@ -124,6 +129,10 @@ RUNTIME = 10.0  # seconds
 I_EXT_AMPLITUDE = 5.0
 I_EXT_START = 0.5  # seconds
 
+# Feature extraction options
+FEATURE_SKIP_BURSTS = 2       # discard initial transient bursts
+FEATURE_WINDOW_BURSTS = 2     # analyse this many bursts after skipping
+
 def create_output_dirs():
     """Create directory structure for results."""
     base_dir = os.path.join(os.path.dirname(__file__), 'hc_sweep')
@@ -176,9 +185,17 @@ def run_single_simulation(params_dict, save_trace=False):
         plotter=False, same_start=False
     )
     
-    # Extract features
-    features_A = extract_features(np.array(neuronA.Vvalues), DT)
-    features_B = extract_features(np.array(neuronB.Vvalues), DT)
+    # Extract features from the steady-state window
+    features_A = extract_features(
+        np.array(neuronA.Vvalues), DT,
+        skip_bursts=FEATURE_SKIP_BURSTS,
+        window_bursts=FEATURE_WINDOW_BURSTS,
+    )
+    features_B = extract_features(
+        np.array(neuronB.Vvalues), DT,
+        skip_bursts=FEATURE_SKIP_BURSTS,
+        window_bursts=FEATURE_WINDOW_BURSTS,
+    )
     
     # Combine results
     result = params_dict.copy()
@@ -315,8 +332,16 @@ def run_gpu_batch(param_combinations):
     
     results = []
     for i, combo in enumerate(param_combinations):
-        features_A = extract_features(V_A_cpu[i], DT)
-        features_B = extract_features(V_B_cpu[i], DT)
+        features_A = extract_features(
+            V_A_cpu[i], DT,
+            skip_bursts=FEATURE_SKIP_BURSTS,
+            window_bursts=FEATURE_WINDOW_BURSTS,
+        )
+        features_B = extract_features(
+            V_B_cpu[i], DT,
+            skip_bursts=FEATURE_SKIP_BURSTS,
+            window_bursts=FEATURE_WINDOW_BURSTS,
+        )
         
         result = combo.copy()
         result.update({
