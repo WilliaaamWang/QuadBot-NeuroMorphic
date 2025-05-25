@@ -11,6 +11,9 @@ import pickle
 import h5py
 import pyarrow as pa
 import pyarrow.parquet as pq
+from scipy.stats import truncnorm
+from numpy.random import default_rng, Generator
+
 
 
 # Try to import parallelization libraries
@@ -58,21 +61,54 @@ DEFAULT_PARAMS = {
     'tau_e': 50.0, 'tau_i': 50.0,
     'g_syn_e': 0.5, 'g_syn_i': 30.0
 }
+# Parameter sweeps -----------------------------------------------------------
 
-# Define parameter ranges - sensible variations around defaults
-PARAM_RANGES = {
-    'Vs0': np.linspace(-55.0, -45.0, 20),          # ±5 mV around -50
-    'Vus0': np.linspace(-57.0, -47.0, 20),         # ±5 mV around -52
-    'g_us': np.linspace(0.005, 0.025, 10),         # around 0.015
-    'delta_Vus': np.linspace(1.2, 2.2, 10),        # around 1.7
-    'tau_us': np.linspace(200.0, 350.0, 10),       # around 278
-    'g_s': np.linspace(0.3, 0.7, 10),              # around 0.5
-    'tau_s': np.linspace(3.0, 6.0, 10),            # around 4.3
-    'g_syn_i': np.linspace(20.0, 40.0, 10),        # around 30
-    'tau_i': np.linspace(40.0, 60.0, 10),          # around 50
-    'Vi_threshold': np.linspace(-25.0, -15.0, 10), # around -20
-    'Vi0': np.linspace(-95.0, -85.0, 10)           # around -90
-}
+# Random sampling configuration ----------------------------------------------
+NUM_SAMPLES   = 20     # number of samples per parameter
+STD_FACTOR    = 0.10   # stdev factor relative to default value
+RNG_SEED      = 42
+
+def generate_param_ranges(n_samples: int = NUM_SAMPLES,
+                          std_factor: float = STD_FACTOR,
+                          seed: int = RNG_SEED,
+                          rng: Generator | None = None) -> dict:
+    """Return random parameter ranges centred on the defaults.
+
+    Parameters that accept negative values (``Vs0``, ``Vus0``, ``Vi_threshold``
+    and ``Vi0``) are drawn from a normal distribution. Parameters that must
+    remain positive are drawn from a truncated normal distribution with a lower
+    bound at zero.  All distributions are centred at the default values.
+    """
+
+    rng = default_rng(seed) if rng is None else rng
+    ranges = {}
+
+    # Parameters allowed to go negative
+    neg_params = ["Vs0", "Vus0", "Vi_threshold", "Vi0"]
+    for p in neg_params:
+        mean = DEFAULT_PARAMS[p]
+        sd = abs(mean) * std_factor
+        samples = rng.normal(loc=mean, scale=sd, size=n_samples)
+        ranges[p] = np.sort(samples)
+
+    # Parameters constrained to be positive
+    pos_params = [
+        "g_us", "delta_Vus", "tau_us",
+        "g_s", "tau_s", "g_syn_i", "tau_i",
+    ]
+    for p in pos_params:
+        mean = DEFAULT_PARAMS[p]
+        sd = abs(mean) * std_factor
+        a = (0 - mean) / sd
+        samples = truncnorm.rvs(a, np.inf, loc=mean, scale=sd,
+                               size=n_samples, random_state=rng)
+        ranges[p] = np.sort(samples)
+
+    return ranges
+
+
+# Instantiate ranges for sweeps ------------------------------------------------
+PARAM_RANGES = generate_param_ranges()
 
 # Parameter groups for combined sweeps
 PARAM_GROUPS = {

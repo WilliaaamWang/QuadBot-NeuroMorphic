@@ -183,3 +183,4 @@ ipython_config.py
 **/*.mat
 
 __pycache__/
+.vscode
