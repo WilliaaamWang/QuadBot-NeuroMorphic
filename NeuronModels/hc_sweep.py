@@ -136,9 +136,24 @@ RUNTIME = 10.0  # seconds
 I_EXT_AMPLITUDE = 5.0
 I_EXT_START = 0.5  # seconds
 
+# Config constants
+TRACE_SAMPLES = 3
+DEFAULT_GPU_BATCH = 800
+
 # Feature extraction options
 FEATURE_SKIP_BURSTS = 2       # discard initial transient bursts
 FEATURE_WINDOW_BURSTS = 2     # analyse this many bursts after skipping
+
+def _auto_batch_size(bytes_per_sim: int, safety: float = 0.54, hard_cap: int | None = None) -> int:
+    """Rerutn a batch size s.t. `bytes_per_sim * batch <= free_gpu * safety`."""
+    if not HAS_TORCH:
+        return 1
+    free, _ = torch.cuda.mem_get_info()
+    target = int(free * safety)
+    bsz = max(target // bytes_per_sim, 1)
+    if hard_cap:
+        bsz = min(bsz, hard_cap)
+    return bsz
 
 def create_output_dirs():
     """Create directory structure for results."""
@@ -228,146 +243,242 @@ def run_single_simulation(params_dict, save_trace=False):
     
     return result
 
-def run_gpu_batch(param_combinations):
-    """Run batch of simulations on GPU using PyTorch."""
+def run_gpu_batch(param_combinations,
+                  trace_indices: list[int] | None = None,
+                  batch_size: int | None = None):
+    """Simulate *all* `param_combinations` on the GPU.
+
+    Parameters
+    ----------
+    param_combinations : list[dict]
+        Each dict overrides one or more entries in ``DEFAULT_PARAMS``.
+    trace_indices : list[int] | None
+        Global indices **within** *param_combinations* whose full voltage
+        traces should be returned and later saved / plotted.  If *None*, no
+        traces are kept.
+    batch_size : int | None
+        Fixed chunk size.  If *None*, use `_auto_batch_size()` to stay within
+        GPU VRAM limits.  The value is honoured exactly – one kernel call per
+        chunk.
+
+    Returns
+    -------
+    list[dict]
+        One result row *per* simulation.  All scalar features are present for
+        every row; the heavy ``V_trace_X`` arrays exist **only** for indices
+        listed in ``trace_indices``.
+    """
+
+    # ------------------------------------------------------------------
+    # 0)  Fallback to CPU if no GPU present
+    # ------------------------------------------------------------------
     if not HAS_TORCH:
         return None
-    
-    print(f"▶︎ [GPU]   launching batch of {len(param_combinations)} sims on CUDA …")
-    device = torch.device('cuda')
-    n_sims = len(param_combinations)
-    n_steps = int(RUNTIME / DT)
-    
-    # Initialize state tensors for all simulations
-    V_A = torch.full((n_sims,), DEFAULT_PARAMS['V0'], device=device)
-    V_B = torch.full((n_sims,), DEFAULT_PARAMS['V0'], device=device) + 0.1  # offset
-    Vs_A = torch.full((n_sims,), DEFAULT_PARAMS['Vs0'], device=device)
-    Vs_B = torch.full((n_sims,), DEFAULT_PARAMS['Vs0'], device=device)
-    Vus_A = torch.full((n_sims,), DEFAULT_PARAMS['Vus0'], device=device)
-    Vus_B = torch.full((n_sims,), DEFAULT_PARAMS['Vus0'], device=device)
-    Si_A = torch.zeros((n_sims,), device=device)
-    Si_B = torch.zeros((n_sims,), device=device)
-    
-    # Create parameter tensors
-    param_tensors = {}
-    for param_name in PARAM_RANGES.keys():
-        values = [combo.get(param_name, DEFAULT_PARAMS.get(param_name, 0)) 
-                  for combo in param_combinations]
-        param_tensors[param_name] = torch.tensor(values, dtype=torch.float32, device=device)
-    
-    # Constants
-    cap = torch.tensor(DEFAULT_PARAMS['cap'], device=device)
-    k = torch.tensor(DEFAULT_PARAMS['k'], device=device)
-    V0 = torch.tensor(DEFAULT_PARAMS['V0'], device=device)
-    g_f = torch.tensor(DEFAULT_PARAMS['g_f'], device=device)
-    V_threshold = torch.tensor(DEFAULT_PARAMS['V_threshold'], device=device)
-    V_reset = torch.tensor(DEFAULT_PARAMS['V_reset'], device=device)
-    
-    # Create I_ext tensor
-    I_ext_tensor = torch.zeros(n_steps, device=device)
-    I_ext_tensor[int(I_EXT_START/DT):] = I_EXT_AMPLITUDE
-    
-    # Storage for traces
-    V_A_trace = torch.zeros((n_sims, n_steps), device=device)
-    V_B_trace = torch.zeros((n_sims, n_steps), device=device)
-    
-    # Main simulation loop
-    for t in range(n_steps):
-        # Mutual inhibition
-        inhib_A = V_B
-        inhib_B = V_A
+
+    # ------------------------------------------------------------------
+    # 1)  Housekeeping
+    # ------------------------------------------------------------------
+    device      = torch.device("cuda")
+    total_sims  = len(param_combinations)
+    n_steps     = int(RUNTIME / DT)
+
+    trace_indices = sorted(set(trace_indices or []))
+    keep_trace_mask = torch.zeros(total_sims, dtype=torch.bool)
+    if trace_indices:
+        keep_trace_mask[trace_indices] = True
+
+    # ------------------------------------------------------------------
+    # 2)  Decide batch size (how many HCOs to integrate *simultaneously*)
+    # ------------------------------------------------------------------
+    bytes_per_trace   = n_steps * 4 * 2          # two float32 vectors
+    est_bytes_per_sim = bytes_per_trace + 512    # scratchpad margin
+    if batch_size is None:
+        batch_size = _auto_batch_size(est_bytes_per_sim,
+                                      hard_cap=DEFAULT_GPU_BATCH)
+    print(f"▶︎ [GPU]   processing {total_sims} sims in chunks of {batch_size} …")
+
+    results: list[dict] = []
+    time_cpu = np.arange(0, RUNTIME, DT, dtype=np.float32)
+
+    # ------------------------------------------------------------------
+    # 3)  Process the workload slice‑by‑slice
+    # ------------------------------------------------------------------
+    for start in range(0, total_sims, batch_size):
+        end          = min(start + batch_size, total_sims)
+        slice_combos = param_combinations[start:end]
+        b            = len(slice_combos)          # slice size
+
+        # ------------------------- state vectors ----------------------
+        V_A  = torch.full((b,), DEFAULT_PARAMS['V0'],  device=device)
+        V_B  = torch.full((b,), DEFAULT_PARAMS['V0']+0.1, device=device)
+        Vs_A = torch.full((b,), DEFAULT_PARAMS['Vs0'], device=device)
+        Vs_B = torch.full((b,), DEFAULT_PARAMS['Vs0'], device=device)
+        Vus_A= torch.full((b,), DEFAULT_PARAMS['Vus0'],device=device)
+        Vus_B= torch.full((b,), DEFAULT_PARAMS['Vus0'],device=device)
+        Si_A = torch.zeros((b,), device=device)
+        Si_B = torch.zeros((b,), device=device)
+
+        # --------------------- per‑parameter tensors ------------------
+        # Assemble *once* per slice to avoid random access during the loop.
+        p_tensor = {}
+        for p in PARAM_RANGES.keys():
+            vals = [c.get(p, DEFAULT_PARAMS.get(p, 0.0)) for c in slice_combos]
+            p_tensor[p] = torch.tensor(vals, dtype=torch.float32, device=device)
+
+        # --------------------------- consts ---------------------------
+        cap        = torch.tensor(DEFAULT_PARAMS['cap'], device=device)
+        k_const    = torch.tensor(DEFAULT_PARAMS['k'],   device=device)
+        V0_const   = torch.tensor(DEFAULT_PARAMS['V0'],  device=device)
+        g_f        = torch.tensor(DEFAULT_PARAMS['g_f'], device=device)
+        V_thresh   = torch.tensor(DEFAULT_PARAMS['V_threshold'], device=device)
+        V_reset    = torch.tensor(DEFAULT_PARAMS['V_reset'],     device=device)
+        Vs_reset   = torch.tensor(DEFAULT_PARAMS['Vs_reset'],    device=device)
+
+        I_ext = torch.zeros(n_steps, device=device)
+        I_ext[int(I_EXT_START/DT):] = I_EXT_AMPLITUDE
+
+        # ----------------------- trace storage -----------------------
+        V_A_trace = torch.zeros((b, n_steps), device=device, dtype=torch.float32)
+        V_B_trace = torch.zeros((b, n_steps), device=device, dtype=torch.float32)
         
-        # Update derivatives
-        dVs_A = k * (V_A - Vs_A) / param_tensors.get('tau_s', torch.tensor(DEFAULT_PARAMS['tau_s'], device=device))
-        dVs_B = k * (V_B - Vs_B) / param_tensors.get('tau_s', torch.tensor(DEFAULT_PARAMS['tau_s'], device=device))
-        dVus_A = k * (V_A - Vus_A) / param_tensors.get('tau_us', torch.tensor(DEFAULT_PARAMS['tau_us'], device=device))
-        dVus_B = k * (V_B - Vus_B) / param_tensors.get('tau_us', torch.tensor(DEFAULT_PARAMS['tau_us'], device=device))
+        # save_this_slice = keep_trace_mask[start:end]
+        # if save_this_slice.any():
+        #     V_A_trace = torch.zeros((b, n_steps), device=device, dtype=torch.float32)
+        #     V_B_trace = torch.zeros((b, n_steps), device=device, dtype=torch.float32)
+        # else:
+        #     V_A_trace = V_B_trace = None  # save memory
         
-        # Synaptic gating
-        Si_inf_A = torch.sigmoid(40 * (inhib_A - param_tensors.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
-        Si_inf_B = torch.sigmoid(40 * (inhib_B - param_tensors.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
-        dSi_A = k * (Si_inf_A - Si_A) / param_tensors.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
-        dSi_B = k * (Si_inf_B - Si_B) / param_tensors.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
-        
-        # Currents
-        I_inh_A = param_tensors.get('g_syn_i', torch.tensor(DEFAULT_PARAMS['g_syn_i'], device=device)) * Si_A * (V_A - param_tensors.get('Vi0', torch.tensor(DEFAULT_PARAMS['Vi0'], device=device)))
-        I_inh_B = param_tensors.get('g_syn_i', torch.tensor(DEFAULT_PARAMS['g_syn_i'], device=device)) * Si_B * (V_B - param_tensors.get('Vi0', torch.tensor(DEFAULT_PARAMS['Vi0'], device=device)))
-        
-        # Membrane potential derivatives
-        dV_A = (k/cap) * (
-            g_f * (V_A - V0)**2 
-            - param_tensors.get('g_s', torch.tensor(DEFAULT_PARAMS['g_s'], device=device)) * (Vs_A - param_tensors.get('Vs0', torch.tensor(DEFAULT_PARAMS['Vs0'], device=device)))**2
-            - param_tensors.get('g_us', torch.tensor(DEFAULT_PARAMS['g_us'], device=device)) * (Vus_A - param_tensors.get('Vus0', torch.tensor(DEFAULT_PARAMS['Vus0'], device=device)))**2
-            + I_ext_tensor[t] - I_inh_A
-        )
-        dV_B = (k/cap) * (
-            g_f * (V_B - V0)**2
-            - param_tensors.get('g_s', torch.tensor(DEFAULT_PARAMS['g_s'], device=device)) * (Vs_B - param_tensors.get('Vs0', torch.tensor(DEFAULT_PARAMS['Vs0'], device=device)))**2
-            - param_tensors.get('g_us', torch.tensor(DEFAULT_PARAMS['g_us'], device=device)) * (Vus_B - param_tensors.get('Vus0', torch.tensor(DEFAULT_PARAMS['Vus0'], device=device)))**2
-            + I_ext_tensor[t] - I_inh_B
-        )
-        
-        # Euler update
-        V_A = V_A + dV_A * DT
-        V_B = V_B + dV_B * DT
-        Vs_A = Vs_A + dVs_A * DT
-        Vs_B = Vs_B + dVs_B * DT
-        Vus_A = Vus_A + dVus_A * DT
-        Vus_B = Vus_B + dVus_B * DT
-        Si_A = Si_A + dSi_A * DT
-        Si_B = Si_B + dSi_B * DT
-        
-        # Spike detection and reset
-        spike_A = V_A >= V_threshold
-        spike_B = V_B >= V_threshold
-        
-        if spike_A.any():
-            V_A[spike_A] = V_reset
-            Vs_A[spike_A] = DEFAULT_PARAMS['Vs_reset']
-            Vus_A[spike_A] += param_tensors.get('delta_Vus', torch.tensor(DEFAULT_PARAMS['delta_Vus'], device=device))[spike_A]
-        
-        if spike_B.any():
-            V_B[spike_B] = V_reset
-            Vs_B[spike_B] = DEFAULT_PARAMS['Vs_reset']
-            Vus_B[spike_B] += param_tensors.get('delta_Vus', torch.tensor(DEFAULT_PARAMS['delta_Vus'], device=device))[spike_B]
-        
-        V_A_trace[:, t] = V_A
-        V_B_trace[:, t] = V_B
-    
-    # Convert back to CPU and extract features
-    V_A_cpu = V_A_trace.cpu().numpy()
-    V_B_cpu = V_B_trace.cpu().numpy()
-    
-    results = []
-    for i, combo in enumerate(param_combinations):
-        features_A = extract_features(
-            V_A_cpu[i], DT,
-            skip_bursts=FEATURE_SKIP_BURSTS,
-            window_bursts=FEATURE_WINDOW_BURSTS,
-        )
-        features_B = extract_features(
-            V_B_cpu[i], DT,
-            skip_bursts=FEATURE_SKIP_BURSTS,
-            window_bursts=FEATURE_WINDOW_BURSTS,
-        )
-        
-        result = combo.copy()
-        result.update({
-            'regime_A': features_A['regime'],
-            'regime_B': features_B['regime'],
-            'spike_count_A': features_A['spike_count'],
-            'spike_count_B': features_B['spike_count'],
-            'mean_spikes_per_burst_A': features_A['mean_spikes_per_burst'],
-            'mean_spikes_per_burst_B': features_B['mean_spikes_per_burst'],
-            'duty_cycle_A': features_A['duty_cycle'],
-            'duty_cycle_B': features_B['duty_cycle'],
-            'interburst_freq_A': features_A['interburst_freq'],
-            'interburst_freq_B': features_B['interburst_freq'],
-            'intraburst_freq_A': features_A['intraburst_freq'],
-            'intraburst_freq_B': features_B['intraburst_freq']
-        })
-        results.append(result)
-    
+        # --------------------------------------------------------------
+        # 3a) Time integration (Euler) *********************************
+        # --------------------------------------------------------------
+        for t in range(n_steps):
+            # Mutual inhibition voltages
+            inhib_A = V_B
+            inhib_B = V_A
+
+            # ---------- Vs & Vus derivatives ----------
+            dVs_A  = k_const * (V_A - Vs_A)  / p_tensor.get('tau_s', torch.tensor(DEFAULT_PARAMS['tau_s'], device=device))
+            dVs_B  = k_const * (V_B - Vs_B)  / p_tensor.get('tau_s', torch.tensor(DEFAULT_PARAMS['tau_s'], device=device))
+            dVus_A = k_const * (V_A - Vus_A) / p_tensor.get('tau_us', torch.tensor(DEFAULT_PARAMS['tau_us'], device=device))
+            dVus_B = k_const * (V_B - Vus_B) / p_tensor.get('tau_us', torch.tensor(DEFAULT_PARAMS['tau_us'], device=device))
+
+            # ---------- Synaptic gating ----------
+            Si_inf_A = torch.sigmoid(40 * (inhib_A - p_tensor.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
+            Si_inf_B = torch.sigmoid(40 * (inhib_B - p_tensor.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
+            dSi_A    = k_const * (Si_inf_A - Si_A) / p_tensor.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
+            dSi_B    = k_const * (Si_inf_B - Si_B) / p_tensor.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
+
+            # ---------- Inhibitory current ----------
+            I_inh_A = p_tensor.get('g_syn_i', torch.tensor(DEFAULT_PARAMS['g_syn_i'], device=device)) * Si_A * (V_A - p_tensor.get('Vi0', torch.tensor(DEFAULT_PARAMS['Vi0'], device=device)))
+            I_inh_B = p_tensor.get('g_syn_i', torch.tensor(DEFAULT_PARAMS['g_syn_i'], device=device)) * Si_B * (V_B - p_tensor.get('Vi0', torch.tensor(DEFAULT_PARAMS['Vi0'], device=device)))
+
+            # ---------- dV ----------
+            dV_A = (k_const / cap) * (
+                g_f * (V_A - V0_const) ** 2
+                - p_tensor.get('g_s', torch.tensor(DEFAULT_PARAMS['g_s'], device=device))   * (Vs_A  - p_tensor.get('Vs0',  torch.tensor(DEFAULT_PARAMS['Vs0'],  device=device))) ** 2
+                - p_tensor.get('g_us',torch.tensor(DEFAULT_PARAMS['g_us'],device=device))   * (Vus_A - p_tensor.get('Vus0',torch.tensor(DEFAULT_PARAMS['Vus0'],device=device))) ** 2
+                + I_ext[t] - I_inh_A
+            )
+            dV_B = (k_const / cap) * (
+                g_f * (V_B - V0_const) ** 2
+                - p_tensor.get('g_s', torch.tensor(DEFAULT_PARAMS['g_s'], device=device))   * (Vs_B  - p_tensor.get('Vs0',  torch.tensor(DEFAULT_PARAMS['Vs0'],  device=device))) ** 2
+                - p_tensor.get('g_us',torch.tensor(DEFAULT_PARAMS['g_us'],device=device))   * (Vus_B - p_tensor.get('Vus0',torch.tensor(DEFAULT_PARAMS['Vus0'],device=device))) ** 2
+                + I_ext[t] - I_inh_B
+            )
+
+            # ---------- Euler update ----------
+            V_A  += dV_A  * DT
+            V_B  += dV_B  * DT
+            Vs_A += dVs_A * DT
+            Vs_B += dVs_B * DT
+            Vus_A+= dVus_A* DT
+            Vus_B+= dVus_B* DT
+            Si_A += dSi_A * DT
+            Si_B += dSi_B * DT
+
+            # ---------- Spike & reset ----------
+            spike_A = V_A >= V_thresh
+            spike_B = V_B >= V_thresh
+            if spike_A.any():
+                V_A [spike_A]  = V_reset
+                Vs_A[spike_A]  = Vs_reset
+                Vus_A[spike_A]+= p_tensor.get('delta_Vus', torch.tensor(DEFAULT_PARAMS['delta_Vus'], device=device))[spike_A]
+            if spike_B.any():
+                V_B [spike_B]  = V_reset
+                Vs_B[spike_B]  = Vs_reset
+                Vus_B[spike_B]+= p_tensor.get('delta_Vus', torch.tensor(DEFAULT_PARAMS['delta_Vus'], device=device))[spike_B]
+
+            # ---------- Store traces if requested ----------
+            # if V_A_trace is not None:
+                V_A_trace[:, t] = V_A
+                V_B_trace[:, t] = V_B
+
+            # if V_A_preview is not None and t % stride == 0:   # decimated previews
+            #     idx_prev = t // stride
+            #     V_A_preview[:, idx_prev] = V_A
+            #     V_B_preview[:, idx_prev] = V_B
+
+
+        V_A_cpu = V_A_trace.cpu().numpy()
+        V_B_cpu = V_B_trace.cpu().numpy()
+        # -------------- slice finished: feature extraction ------------
+        for local_i, combo in enumerate(slice_combos):
+            global_i = start + local_i
+
+            # # --- bring voltage arrays to CPU only if needed ---
+            # keep_trace = bool(keep_trace_mask[global_i])
+            # if keep_trace:
+            #     V_A_cpu = V_A_trace[local_i].detach().cpu().numpy()
+            #     V_B_cpu = V_B_trace[local_i].detach().cpu().numpy()
+            # else:
+            #     V_A_cpu = V_A_preview[local_i].detach().cpu().numpy()
+            #     V_B_cpu = V_B_preview[local_i].detach().cpu().numpy()
+
+            # --- feature extraction (still CPU; minimal data copy) ---
+            feats_A = extract_features(
+                # V_A_cpu if keep_trace else V_A_trace[local_i].detach().cpu().numpy()[::64],  # decimate if trace not saved
+                V_A_cpu[global_i],
+                DT,
+                skip_bursts=FEATURE_SKIP_BURSTS,
+                window_bursts=FEATURE_WINDOW_BURSTS,
+            )
+            feats_B = extract_features(
+                # V_B_cpu if keep_trace else V_B_trace[local_i].detach().cpu().numpy()[::64],
+                V_B_cpu[global_i],
+                DT,
+                skip_bursts=FEATURE_SKIP_BURSTS,
+                window_bursts=FEATURE_WINDOW_BURSTS,
+            )
+
+            row = combo.copy()
+            row.update({
+                'regime_A': feats_A['regime'],
+                'regime_B': feats_B['regime'],
+                'spike_count_A': feats_A['spike_count'],
+                'spike_count_B': feats_B['spike_count'],
+                'mean_spikes_per_burst_A': feats_A['mean_spikes_per_burst'],
+                'mean_spikes_per_burst_B': feats_B['mean_spikes_per_burst'],
+                'duty_cycle_A': feats_A['duty_cycle'],
+                'duty_cycle_B': feats_B['duty_cycle'],
+                'interburst_freq_A': feats_A['interburst_freq'],
+                'interburst_freq_B': feats_B['interburst_freq'],
+                'intraburst_freq_A': feats_A['intraburst_freq'],
+                'intraburst_freq_B': feats_B['intraburst_freq']
+            })
+
+            # if keep_trace:
+            #     row['V_trace_A'] = V_A_cpu
+            #     row['V_trace_B'] = V_B_cpu
+            #     row['time']      = time_cpu
+
+            results.append(row)
+
+        # ---------------- cleanup per‑slice tensors -------------------
+        del V_A, V_B, Vs_A, Vs_B, Vus_A, Vus_B, Si_A, Si_B
+        if V_A_trace is not None:
+            del V_A_trace, V_B_trace
+        torch.cuda.empty_cache()
+
     return results
 
 def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: dict):
@@ -395,137 +506,84 @@ def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: di
     plt.savefig(os.path.join(dirs["plots"], "traces", fname), dpi=150)
     plt.close(fig)
 
-# def single_param_sweep(param_name, param_values, dirs):
-#     """Sweep a single parameter."""
-#     print(f"\nSweeping {param_name}...")
-    
-#     results = []
-#     traces_to_save = [0, len(param_values)//2, len(param_values)-1]  # First, middle, last
-    
-#     # Create parameter combinations
-#     param_combos = [{param_name: val} for val in param_values]
-    
-#     # Run simulations
-#     if HAS_TORCH and len(param_combos) > 10:
-#         # Use GPU for batch processing
-#         batch_size = 100
-#         for i in range(0, len(param_combos), batch_size):
-#             batch = param_combos[i:i+batch_size]
-#             batch_results = run_gpu_batch(batch)
-#             if batch_results:
-#                 results.extend(batch_results)
-#             else:
-#                 # Fallback to CPU
-#                 for j, combo in enumerate(batch):
-#                     save_trace = (i+j) in traces_to_save
-#                     results.append(run_single_simulation(combo, save_trace))
-#     else:
-#         # Use CPU (parallel if available)
-#         if HAS_JOBLIB:
-#             # Parallel processing
-#             results = Parallel(n_jobs=-1)(
-#                 delayed(run_single_simulation)(combo, i in traces_to_save)
-#                 for i, combo in enumerate(param_combos)
-#             )
-#         else:
-#             # Serial processing
-#             for i, combo in enumerate(tqdm(param_combos, desc=param_name)):
-#                 results.append(run_single_simulation(combo, i in traces_to_save))
-    
-#     # Save results
-#     df = pd.DataFrame(results)
-#     csv_path = os.path.join(dirs['single'], f'{param_name}_sweep.csv')
-#     df.to_csv(csv_path, index=False)
-    
-#     # Save traces with HDF5
-#     h5_path = os.path.join(dirs['data'], f'{param_name}_traces.h5')
-#     with h5py.File(h5_path, 'w') as f:
-#         for i, result in enumerate(results):
-#             if 'V_trace_A' in result:
-#                 grp = f.create_group(f'sim_{i}')
-#                 grp.create_dataset('V_A', data=result['V_trace_A'])
-#                 grp.create_dataset('V_B', data=result['V_trace_B'])
-#                 grp.create_dataset('time', data=result['time'])
-#                 grp.attrs[param_name] = param_values[i]
-    
-#     # Plot results
-#     plot_single_param_results(df, param_name, param_values, dirs)
-    
-#     return df
 
+def single_param_sweep(param_name: str,
+                       param_values: np.ndarray,
+                       dirs: dict,
+                       n_plot: int = TRACE_SAMPLES,
+                       batch_size: int | None = None):
+    """Sweep *one* parameter and collect scalar outputs.
 
-def single_param_sweep(param_name, param_values, dirs):
-    """Sweep a *single* parameter and now save a voltage‑trace PNG for **every**
-    simulation run (was previously just three)."""
+    Key points vs your old version:
+      • **No double‑simulation**.  When CUDA is used, the *same* traces from
+        `run_gpu_batch()` are reused for plotting; CPU rerun removed.
+      • Only `n_plot` evenly‑spaced traces are saved (defaults to
+        ``TRACE_SAMPLES``=3) instead of every single simulation.
+      • Optional ``batch_size`` forwarded directly.
+    """
+
     print(f"\nSweeping {param_name} … ({len(param_values)} values)")
 
-    results = []
+    # ---------------- build combinations ----------------------------
+    param_combos = [{param_name: v} for v in param_values]
+    n_total      = len(param_combos)
 
-    # Build list of param‑dict combos
-    param_combos = [{param_name: val} for val in param_values]
-
-    # Decide execution path ----------------------------------------------------
-    use_gpu_batches = HAS_TORCH and len(param_combos) > 50
-
-    if use_gpu_batches:
-        # GPU for features – then CPU rerun for traces so we still get PNGs
-        batch_size = 200
-
-        print("▶︎ [GPU]   using run_gpu_batch() for feature extraction …")
-        for i in tqdm(range(0, len(param_combos), batch_size), desc="GPU batches"):
-            batch = param_combos[i:i+batch_size]
-            gpu_feats = run_gpu_batch(batch) or []
-            if gpu_feats:
-                print(f"Batch {i//batch_size + 1} processed on GPU, {len(gpu_feats)} results.")
-                results.extend(gpu_feats)
-            else:  # fallback – run on CPU one‑by‑one with traces
-                for combo in batch:
-                    print(f"Running fallback CPU simulation for {combo[param_name]:.3f}...")
-                    res = run_single_simulation(combo, save_trace=True)
-                    results.append(res)
-            # In *any* case, generate traces PNGs on CPU so we have plots
-            for combo in batch:
-                label = f"{param_name}_{combo[param_name]:.3f}"
-                trace_res = run_single_simulation(combo, save_trace=True)
-                _plot_voltage_trace(trace_res, param_name, label, dirs)
+    if n_plot >= n_total:
+        trace_indices = list(range(n_total))
     else:
-        cpu_mode = "joblib‑parallel" if HAS_JOBLIB else "serial"
-        print(f"▶︎ [CPU]   executing in {cpu_mode} mode …")
-        # CPU route (parallel if joblib is available)
+        trace_indices = np.linspace(0, n_total - 1, n_plot, dtype=int).tolist()
+
+    # ---------------- choose execution path -------------------------
+    use_gpu = HAS_TORCH and n_total > 50
+
+    if use_gpu:
+        print("▶︎ [GPU]   extracting features & (selected) traces in CUDA …")
+        results = run_gpu_batch(param_combos,
+                                trace_indices=trace_indices,
+                                batch_size=batch_size)
+    else:
+        mode = "joblib‑parallel" if HAS_JOBLIB else "serial"
+        print(f"▶︎ [CPU]   executing in {mode} mode …")
         if HAS_JOBLIB:
             from joblib import Parallel, delayed
+            trace_set = set(trace_indices)
             results = Parallel(n_jobs=-1)(
-                delayed(run_single_simulation)(combo, True) for combo in tqdm(param_combos, desc=param_name)
+                delayed(run_single_simulation)(combo, i in trace_set)
+                for i, combo in enumerate(tqdm(param_combos, desc=param_name))
             )
         else:
-            for combo in tqdm(param_combos, desc=param_name):
-                results.append(run_single_simulation(combo, True))
-        # Draw PNGs directly from stored traces
-        for res in results:
-            label = f"{param_name}_{res[param_name]:.3f}"
-            _plot_voltage_trace(res, param_name, label, dirs)
+            results = []
+            trace_set = set(trace_indices)
+            for i, combo in enumerate(tqdm(param_combos, desc=param_name)):
+                results.append(run_single_simulation(combo, i in trace_set))
 
-    # ---------------------------------------------------------------------
-    # Save numeric results -------------------------------------------------
+    # ---------------- plot only the kept traces ---------------------
+    for idx in trace_indices:
+        res = results[idx]
+        label = f"{param_name}_{res[param_name]:.3f}"
+        _plot_voltage_trace(res, param_name, label, dirs)
+
+    # ---------------- persist numeric results -----------------------
     df = pd.DataFrame(results)
-    csv_path = os.path.join(dirs["single"], f"{param_name}_sweep.csv")
+    csv_path = os.path.join(dirs['single'], f"{param_name}_sweep.csv")
     df.to_csv(csv_path, index=False)
 
-    # HDF5 traces ----------------------------------------------------------
-    h5_path = os.path.join(dirs["data"], f"{param_name}_traces.h5")
+    # ---------------- store traces (only the selected ones) ---------
+    h5_path = os.path.join(dirs['data'], f"{param_name}_traces.h5")
     with h5py.File(h5_path, "w") as f:
         for i, res in enumerate(results):
-            if "V_trace_A" in res:
+            if 'V_trace_A' in res:  # saved only for trace_indices
                 grp = f.create_group(f"sim_{i}")
-                grp.create_dataset("V_A", data=res["V_trace_A"])
-                grp.create_dataset("V_B", data=res["V_trace_B"])
-                grp.create_dataset("time", data=res["time"])
+                grp.create_dataset("V_A", data=res['V_trace_A'])
+                grp.create_dataset("V_B", data=res['V_trace_B'])
+                grp.create_dataset("time", data=res['time'])
                 grp.attrs[param_name] = res[param_name]
 
-    # Overview metric plots (unchanged) -----------------------------------
+    # ---------------- overview metric plots (unchanged) -------------
     plot_single_param_results(df, param_name, param_values, dirs)
 
     return df
+
 
 def plot_single_param_results(df, param_name, param_values, dirs):
     """Plot results from single parameter sweep."""
@@ -744,10 +802,10 @@ def main():
     dirs = create_output_dirs()
 
     # 1) SINGLE‑PARAMETER SWEEPS
-    single_dfs = []
-    for p_name, p_vals in PARAM_RANGES.items():
-        df = single_param_sweep(p_name, p_vals, dirs)
-        single_dfs.append(df)
+    # single_dfs = []
+    # for p_name, p_vals in PARAM_RANGES.items():
+    #     df = single_param_sweep(p_name, p_vals, dirs)
+    #     single_dfs.append(df)
 
     # 2) MULTI‑PARAMETER GROUP SWEEPS
     multi_dfs = []
@@ -756,7 +814,7 @@ def main():
         multi_dfs.append(df)
 
     # 3) Aggregation (optional but handy)
-    _concat_and_store(single_dfs + multi_dfs, dirs)
+    # _concat_and_store(single_dfs + multi_dfs, dirs)
 
     # 4) Example traces – default and an edge‑case variant
     save_example_traces({}, dirs, label="default_params")
