@@ -16,12 +16,12 @@ NeuronModels/Halfcentre_Plots/*
 NeuronModels/hc_sweep/data/*
 !NeuronModels/hc_sweep/data/.gitkeep
 
-NeuronModels/hc_sweep/multi_param/*
-!NeuronModels/hc_sweep/multi_param/.gitkeep
+# NeuronModels/hc_sweep/multi_param/*
+# !NeuronModels/hc_sweep/multi_param/.gitkeep
 
-NeuronModels/hc_sweep/plots/*
-!NeuronModels/hc_sweep/plots/.gitkeep
-!NeuronModels/hc_sweep/plots/traces/
+# NeuronModels/hc_sweep/plots/*
+# !NeuronModels/hc_sweep/plots/.gitkeep
+# !NeuronModels/hc_sweep/plots/traces/
 
 NeuronModels/hc_sweep/plots/traces/*
 !NeuronModels/hc_sweep/plots/traces/.gitkeep
@@ -38,6 +38,8 @@ NeuronModels/MQIF_sweep/*
 NeuronModels/t1.py
 NeuronModels/dum.py
 NeuronModels/gptcode.py
+NeuronModels/test_cuda.py
+NeuronModels/hc_sweep.zip
 
 # ========================
 # Simulink Embedded Coder
