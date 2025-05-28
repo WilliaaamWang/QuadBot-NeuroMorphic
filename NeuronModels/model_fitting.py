@@ -258,7 +258,7 @@ def analyse_single_param(param: str, degree: int = 2) -> None:
         eq_before = _format_equation(model_before, [param])
         eq_after = _format_equation(model_after, [param])
 
-        with open(feature_dir / "fit.txt", "w") as f:
+        with open(feature_dir / f"fit_{degree}.txt", "w") as f:
             f.write(f"Before: {eq_before} (R2={r2_before:.4f})\n")
             f.write(f"After: {eq_after} (R2={r2_after:.4f})\n")
 
@@ -269,7 +269,7 @@ def analyse_single_param(param: str, degree: int = 2) -> None:
             model_before,
             model_after,
             out_idx,
-            feature_dir / "fit.png",
+            feature_dir / f"fit_{degree}.png",
         )
 
 
@@ -298,9 +298,9 @@ def analyse_group(name: str, params: list[str], degree: int = 1) -> None:
             continue
         model, r2 = res
         eq = _format_equation(model, params)
-        with open(feature_dir / "fit.txt", "w") as f:
+        with open(feature_dir / f"fit_{degree}.txt", "w") as f:
             f.write(f"Equation: {eq}\nR2: {r2:.4f}\n")
-        _plot_multidim_fit(df, params, feat, model, feature_dir / "fit.png")
+        _plot_multidim_fit(df, params, feat, model, feature_dir / f"fit_{degree}.png")
 
 
 def main() -> None:
