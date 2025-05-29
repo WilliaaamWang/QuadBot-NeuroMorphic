@@ -14,7 +14,23 @@ import pyarrow.parquet as pq
 from scipy.stats import truncnorm
 from numpy.random import default_rng, Generator
 
+# Simulation parameters
+DT = 5e-5
+RUNTIME = 10.0  # seconds
+I_EXT_AMPLITUDE = 5.0
+I_EXT_START = 0.5  # seconds
 
+SAME_START = True  # whether to start both neurons at the same voltage
+INHIB_THRESH_FACTOR = 3/4  # factor for inhibitory threshold
+
+# Config constants
+TRACE_SAMPLES_SINGLE = 10  # number of traces to save in single parameter sweeps
+TRACE_SAMPLES_MULTI = 20  # number of traces to save in multi-parameter sweeps
+DEFAULT_GPU_BATCH = 800
+
+# Feature extraction options
+FEATURE_SKIP_BURSTS = 2       # discard initial transient bursts
+FEATURE_WINDOW_BURSTS = 2     # analyse this many bursts after skipping
 
 # Try to import parallelization libraries
 try:
@@ -130,19 +146,7 @@ PARAM_GROUPS = {
     'synaptic': ['g_syn_i', 'tau_i', 'Vi_threshold', 'Vi0']
 }
 
-# Simulation parameters
-DT = 5e-5
-RUNTIME = 10.0  # seconds
-I_EXT_AMPLITUDE = 5.0
-I_EXT_START = 0.5  # seconds
 
-# Config constants
-TRACE_SAMPLES = 3
-DEFAULT_GPU_BATCH = 800
-
-# Feature extraction options
-FEATURE_SKIP_BURSTS = 2       # discard initial transient bursts
-FEATURE_WINDOW_BURSTS = 2     # analyse this many bursts after skipping
 
 def _auto_batch_size(bytes_per_sim: int, safety: float = 0.54, hard_cap: int | None = None) -> int:
     """Rerutn a batch size s.t. `bytes_per_sim * batch <= free_gpu * safety`."""
@@ -182,15 +186,22 @@ def run_single_simulation(params_dict, save_trace=False):
     # Create neurons with specified parameters
     neuron_params = DEFAULT_PARAMS.copy()
     neuron_params.update(params_dict)
+
+    # Create the diff in inhibitory threshold for half-centre neurons
+    Vi_threshold_A = neuron_params.get('Vi_threshold', DEFAULT_PARAMS['Vi_threshold'])
+    Vi_threshold_B = Vi_threshold_A * INHIB_THRESH_FACTOR
+    
     
     neuronA = SynapticNeuron(
         excitatory_Vin=None, 
         inhibitory_Vin=None,
+        Vi_threshold=Vi_threshold_A,
         **neuron_params
     )
     neuronB = SynapticNeuron(
         excitatory_Vin=None,
         inhibitory_Vin=None,
+        Vi_threshold=Vi_threshold_B,
         **neuron_params
     )
     
@@ -204,7 +215,7 @@ def run_single_simulation(params_dict, save_trace=False):
         I_ext, I_ext,
         excit_ext, inhib_ext, excit_ext, inhib_ext,
         dt=DT, runtime=RUNTIME, 
-        plotter=False, same_start=False
+        plotter=False, same_start=SAME_START
     )
     
     # Extract features from the steady-state window
@@ -310,7 +321,10 @@ def run_gpu_batch(param_combinations,
 
         # ------------------------- state vectors ----------------------
         V_A  = torch.full((b,), DEFAULT_PARAMS['V0'],  device=device)
-        V_B  = torch.full((b,), DEFAULT_PARAMS['V0']+0.1, device=device)
+        if SAME_START:
+            V_B  = torch.full((b,), DEFAULT_PARAMS['V0'],  device=device)
+        else:
+            V_B  = torch.full((b,), DEFAULT_PARAMS['V0']+0.1, device=device)
         Vs_A = torch.full((b,), DEFAULT_PARAMS['Vs0'], device=device)
         Vs_B = torch.full((b,), DEFAULT_PARAMS['Vs0'], device=device)
         Vus_A= torch.full((b,), DEFAULT_PARAMS['Vus0'],device=device)
@@ -324,6 +338,9 @@ def run_gpu_batch(param_combinations,
         for p in PARAM_RANGES.keys():
             vals = [c.get(p, DEFAULT_PARAMS.get(p, 0.0)) for c in slice_combos]
             p_tensor[p] = torch.tensor(vals, dtype=torch.float32, device=device)
+        
+        p_tensor['Vi_threshold_A'] = p_tensor.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))
+        p_tensor['Vi_threshold_B'] = p_tensor['Vi_threshold_A'] * INHIB_THRESH_FACTOR  # set B to have inhib threshold by factor INHIB_THRESH_FACTOR
 
         # --------------------------- consts ---------------------------
         cap        = torch.tensor(DEFAULT_PARAMS['cap'], device=device)
@@ -363,8 +380,8 @@ def run_gpu_batch(param_combinations,
             dVus_B = k_const * (V_B - Vus_B) / p_tensor.get('tau_us', torch.tensor(DEFAULT_PARAMS['tau_us'], device=device))
 
             # ---------- Synaptic gating ----------
-            Si_inf_A = torch.sigmoid(40 * (inhib_A - p_tensor.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
-            Si_inf_B = torch.sigmoid(40 * (inhib_B - p_tensor.get('Vi_threshold', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
+            Si_inf_A = torch.sigmoid(40 * (inhib_A - p_tensor.get('Vi_threshold_A', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
+            Si_inf_B = torch.sigmoid(40 * (inhib_B - p_tensor.get('Vi_threshold_B', torch.tensor(DEFAULT_PARAMS['Vi_threshold'], device=device))))
             dSi_A    = k_const * (Si_inf_A - Si_A) / p_tensor.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
             dSi_B    = k_const * (Si_inf_B - Si_B) / p_tensor.get('tau_i', torch.tensor(DEFAULT_PARAMS['tau_i'], device=device))
 
@@ -502,7 +519,7 @@ def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: di
 
     fig.suptitle(f"{param_name} sweep – {label}")
     plt.tight_layout()
-    fname = f"trace_{label}.png"
+    fname = f"single_{label}.png"
     plt.savefig(os.path.join(dirs["plots"], "traces", fname), dpi=150)
     plt.close(fig)
 
@@ -510,7 +527,7 @@ def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: di
 def single_param_sweep(param_name: str,
                        param_values: np.ndarray,
                        dirs: dict,
-                       n_plot: int = TRACE_SAMPLES,
+                       n_plot: int = TRACE_SAMPLES_SINGLE,
                        batch_size: int | None = None):
     """Sweep *one* parameter and collect scalar outputs.
 
@@ -802,26 +819,51 @@ def main():
     dirs = create_output_dirs()
 
     # 1) SINGLE‑PARAMETER SWEEPS
-    # single_dfs = []
-    # for p_name, p_vals in PARAM_RANGES.items():
-    #     df = single_param_sweep(p_name, p_vals, dirs)
-    #     single_dfs.append(df)
+    single_dfs = []
+    for p_name, p_vals in PARAM_RANGES.items():
+        df = single_param_sweep(p_name, p_vals, dirs)
+        single_dfs.append(df)
 
-    # 2) MULTI‑PARAMETER GROUP SWEEPS
+    # # 2) MULTI‑PARAMETER GROUP SWEEPS
     multi_dfs = []
     for grp, names in PARAM_GROUPS.items():
         df = multi_param_sweep(grp, names, dirs)
         multi_dfs.append(df)
 
     # 3) Aggregation (optional but handy)
-    # _concat_and_store(single_dfs + multi_dfs, dirs)
+    _concat_and_store(single_dfs + multi_dfs, dirs)
 
     # 4) Example traces – default and an edge‑case variant
-    save_example_traces({}, dirs, label="default_params")
-    edgecase = {"g_syn_i": PARAM_RANGES["g_syn_i"][-1],
-                "Vs0": PARAM_RANGES["Vs0"][0]}
-    save_example_traces(edgecase, dirs, label="edge_case")
+    # save_example_traces({}, dirs, label="default_params")
+    # edgecase = {"g_syn_i": PARAM_RANGES["g_syn_i"][-1],
+    #             "Vs0": PARAM_RANGES["Vs0"][0]}
+    # save_example_traces(edgecase, dirs, label="edge_case")
 
+# Plot from trace stored ./hc_sweep/data/[resting_potetials|ultraslow_dynamics|slow_dynamics|synaptic]_results.pkl, select a certain number evenly from the trace
+def plot_from_trace(param_name: str, dirs: dict, n_plot: int = 20):
+    """Plot traces from a stored parameter sweep result."""
+    pkl_path = os.path.join(dirs['data'], f'{param_name}_results.pkl')
+    if not os.path.exists(pkl_path):
+        print(f"Error: {pkl_path} does not exist.")
+        return
+
+    with open(pkl_path, 'rb') as f:
+        df = pickle.load(f)
+
+    if len(df) == 0:
+        print(f"No data found in {pkl_path}.")
+        return
+    print(f"Loaded {len(df)} rows from {pkl_path}.")
+    if n_plot > len(df):
+        n_plot = len(df)
+    trace_indices = np.linspace(0, len(df) - 1, n_plot, dtype=int).tolist()
+    print(f"Plotting {n_plot} traces from {param_name} sweep.")
+
+    for idx in trace_indices:
+        res = df.iloc[idx]
+    print(res.keys())
+        # label = f"{param_name}_{res[param_name]:.3f}"
+        # _plot_voltage_trace(res, param_name, label, dirs)
 
 # -----------------------------------------------------------------------------
 #  Script entry‑point
@@ -830,5 +872,6 @@ def main():
 if __name__ == "__main__":
     start = time.time()
     main()
+    # plot_from_trace("resting_potentials", create_output_dirs())
     elapsed = time.time() - start
     print(f"\n🏁  Total runtime: {elapsed/60:.1f} min")

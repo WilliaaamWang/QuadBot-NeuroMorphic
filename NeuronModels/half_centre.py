@@ -87,40 +87,8 @@ def simulate_halfcentre(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_
         #     print(f"Time: {t}, {excit_A}, {excit_B}, {inhib_A}, {inhib_B}, {neuronA.Se}, {neuronB.Se}, {neuronA.Si}, {neuronB.Si}")
         # cnt += 1
 
-    if plotter:
-        fig, axs = plt.subplots(5,1, figsize=(12, 8))
-
-        axs[0].plot(t_array, I_ext_array_A, color="tab:blue", label="Applied I_ext")
-        axs[0].plot(t_array, I_ext_array_B, color="tab:orange")
-        axs[0].set_title("Applied I_ext")
-        axs[0].set_xlabel("Time (s)")
-        axs[0].set_ylabel("I_ext (mA/nF)")
-        axs[0].legend()
-
-        axs[1].plot(t_array, neuronA.Vvalues, color="tab:green")
-        axs[1].set_title("Neuron A Membrane Potential (V)")
-        axs[1].set_xlabel("Time (s)")
-        axs[1].set_ylabel("Voltage (mV)")
-
-        axs[3].plot(t_array, neuronB.Vvalues, color="tab:red")
-        axs[3].set_title("Neuron B Membrane Potential (V)")
-        axs[3].set_xlabel("Time (s)")
-        axs[3].set_ylabel("Voltage (mV)")
-
-        axs[2].plot(t_array, neuronA.Sivalues, color="tab:blue", label="Neuron A Si")
-        axs[2].set_title("Neuron A Si")
-        axs[2].set_xlabel("Time (s)")
-        axs[2].set_ylabel("Synaptic Weight")
-
-        axs[4].plot(t_array, neuronB.Sivalues, color="tab:orange", label="Neuron B Si")
-        axs[4].set_title("Neuron B Si")
-        axs[4].set_xlabel("Time (s)")
-        axs[4].set_ylabel("Synaptic Weight")
-
-        plt.tight_layout()
-        fig.suptitle(f"Half Centre. Veth A = {neuronA.Ve_threshold}, Vith A = {neuronA.Vi_threshold}, Veth B = {neuronB.Ve_threshold}, Vith B = {neuronB.Vi_threshold}", fontsize=16)
-        plt.subplots_adjust(top=0.92)
-        plt.savefig(os.path.join(os.path.dirname(__file__),"Halfcentre_Plots", f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_dt={dt}.png"))
+    # if plotter:
+        
         # plt.show()
 
         # # Sum over minor arrays for inhibitory values before plotting
@@ -158,6 +126,42 @@ def simulate_halfcentre(neuronA: SynapticNeuron, neuronB: SynapticNeuron, I_ext_
     # neuronA = SynapticNeuron(excitatory_Vin=VA_ext[0], inhibitory_Vin=np.array([VA_ext[1], VofB]))
     # neuronB = SynapticNeuron(excitatory_Vin=VB_ext[0], inhibitory_Vin=np.array([VB_ext[1], VofA]))
 
+def save_plot(neuronA, neuronB, I_ext_array_A, I_ext_array_B, plotname, runtime, dt):
+    t_array = np.arange(0, runtime, dt)
+
+    fig, axs = plt.subplots(5,1, figsize=(12, 8))
+
+    axs[0].plot(t_array, I_ext_array_A, color="tab:blue", label="Applied I_ext")
+    axs[0].plot(t_array, I_ext_array_B, color="tab:orange")
+    axs[0].set_title("Applied I_ext")
+    axs[0].set_xlabel("Time (s)")
+    axs[0].set_ylabel("I_ext (mA/nF)")
+    axs[0].legend()
+
+    axs[1].plot(t_array, neuronA.Vvalues, color="tab:green")
+    axs[1].set_title("Neuron A Membrane Potential (V)")
+    axs[1].set_xlabel("Time (s)")
+    axs[1].set_ylabel("Voltage (mV)")
+
+    axs[3].plot(t_array, neuronB.Vvalues, color="tab:red")
+    axs[3].set_title("Neuron B Membrane Potential (V)")
+    axs[3].set_xlabel("Time (s)")
+    axs[3].set_ylabel("Voltage (mV)")
+
+    axs[2].plot(t_array, neuronA.Sivalues, color="tab:blue", label="Neuron A Si")
+    axs[2].set_title("Neuron A Si")
+    axs[2].set_xlabel("Time (s)")
+    axs[2].set_ylabel("Synaptic Weight")
+
+    axs[4].plot(t_array, neuronB.Sivalues, color="tab:orange", label="Neuron B Si")
+    axs[4].set_title("Neuron B Si")
+    axs[4].set_xlabel("Time (s)")
+    axs[4].set_ylabel("Synaptic Weight")
+
+    plt.tight_layout()
+    fig.suptitle(f"Half Centre. Veth A = {neuronA.Ve_threshold}, Vith A = {neuronA.Vi_threshold}, Veth B = {neuronB.Ve_threshold}, Vith B = {neuronB.Vi_threshold}", fontsize=16)
+    plt.subplots_adjust(top=0.92)
+    plt.savefig(os.path.join(os.path.dirname(__file__),"Halfcentre_Plots", plotname))
 
 def save_hc_data(neuronA, neuronB, dt, filename):
     """
@@ -249,13 +253,13 @@ def analyse_hc_features(dt, filename):
     # print(f"Intra-burst frequencies A: {burst_metrics_data_A['intra_burst_freq_lists']}")
     # print(f"Intra-burst frequencies B: {burst_metrics_data_B['intra_burst_freq_lists']}")
 
-def demo(mode="both"):
+def demo(amplitude=5, inhib_threshold=-20, mode="both"):
     dt = 5e-5
     # dt = 1e-4
     runtime = 10.0
 
     numsteps = int(runtime/dt)
-    amplitude = 5
+    amplitude = amplitude
     current_ext = np.zeros(numsteps)
     start_time = int(0.5/dt)
     current_ext[start_time:] = amplitude
@@ -270,46 +274,79 @@ def demo(mode="both"):
     inhib_ext_B = []
 
     plotter = True
-    same_start = False
+    # same_start = False
+    same_start = True
 
     initial_excit = -52
     initial_inhib = -52
 
-    neuronA = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-20,)
-    neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=-30,)
+    initial_excit = None
+    initial_inhib = None
+
+    INHIB_THRESHOLD = inhib_threshold
+    INHIB_THRESH_FACTOR = 3/4
+
+
+    neuronA = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=INHIB_THRESHOLD,)
+    neuronB = SynapticNeuron(excitatory_Vin=initial_excit, inhibitory_Vin=initial_inhib, Ve_threshold=-50, Vi_threshold=INHIB_THRESHOLD*INHIB_THRESH_FACTOR,)
 
     csv_dir = os.path.join(os.path.dirname(__file__), "Halfcentre_Plots")
 
     if not os.path.exists(csv_dir):
         os.makedirs(csv_dir)
-    filename = os.path.join(csv_dir, f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_I={amplitude}_dt={dt}.csv")
+    filename = os.path.join(csv_dir, f"halfcentre_{runtime}_{neuronA.Ve_threshold}_{neuronA.Vi_threshold}_{neuronB.Ve_threshold}_{neuronB.Vi_threshold}_I={amplitude}_dt={dt}")
 
     if mode == "both":
         # Simulate the half-centre synapse model
-        neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)    
+        neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
+
+        plotname = filename + ".png"
+        csvname = filename + ".csv"
+
+        # Save plot of the simulation
+        save_plot(neuronA, neuronB, current_ext, current_ext, plotname, runtime, dt)
         
         # Save neuron data to CSV
-        save_hc_data(neuronA, neuronB, dt, filename)
+        save_hc_data(neuronA, neuronB, dt, csvname)
         # Analyse features from saved data
-        analyse_hc_features(dt, filename)
+        analyse_hc_features(dt, csvname)
 
     elif mode == "sim":
         # Simulate the half-centre synapse model
         neuronA, neuronB = simulate_halfcentre(neuronA, neuronB, current_ext, current_ext, excit_ext_A, excit_ext_B, inhib_ext_A, inhib_ext_B, dt, runtime, plotter, same_start)
 
-        # Save neuron data to CSV
-        save_hc_data(neuronA, neuronB, dt, filename)
+        plotname = filename + ".png"
+        csvname = filename + ".csv"
 
-    elif mode == "analyze":
+        # Save plot of the simulation
+        save_plot(neuronA, neuronB, current_ext, current_ext, plotname, runtime, dt)
+
+        # Save neuron data to CSV
+        save_hc_data(neuronA, neuronB, dt, csvname)
+
+    # elif mode == "analyze":
         # Analyse features from saved data
-        csvname = "halfcentre_10.0_-50_-20_-50_-30_I=5_dt=0.0001"
-        filename = os.path.join(csv_dir, csvname + ".csv")
-        analyse_hc_features(dt, filename)
+        # csvname = "halfcentre_10.0_-50_-20_-50_-30_I=5_dt=0.0001"
+        # filename = os.path.join(csv_dir, csvname + ".csv")
+        # analyse_hc_features(dt, filename)
     
 
 if __name__ == "__main__":
     mode = "both"
     # mode = "sim"
     # mode = "analyze"
-    demo()
+
+    inhib_thresholds = [-20, -30, -40]
+    for inhib_threshold in inhib_thresholds:
+        print(f"Running demo with inhib_threshold = {inhib_threshold}")
+        demo(inhib_threshold=inhib_threshold, mode=mode)
+        # demo(mode, inhib_threshold=inhib_threshold)
+    
+    amplitudes = [2,3,4,5]
+    for amplitude in amplitudes:
+        print(f"Running demo with amplitude = {amplitude}")
+        demo(amplitude=amplitude, mode=mode)
+    
+    
+    # demo()
     

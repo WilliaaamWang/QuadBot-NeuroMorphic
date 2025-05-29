@@ -303,6 +303,97 @@ def analyse_group(name: str, params: list[str], degree: int = 1) -> None:
         _plot_multidim_fit(df, params, feat, model, feature_dir / f"fit_{degree}.png")
 
 
+
+# New helper function to load and combine all single-param and group sweep data
+def _load_all_data() -> pd.DataFrame:
+    """Load and merge all single-parameter and multi-parameter sweep results (bursting only)."""
+    frames = []
+    # List of all individual parameters (from single_param sweeps)
+    all_params = [
+        "Vs0", "Vus0", "g_us", "delta_Vus", "tau_us",
+        "g_s", "tau_s", "g_syn_i", "tau_i", "Vi_threshold", "Vi0",
+    ]
+    # Load each single-parameter sweep CSV
+    for param in all_params:
+        df = _load_csv(SINGLE_DIR / f"{param}_sweep.csv")
+        if df is None:
+            continue
+        df = _only_bursting(_average_features(df))
+        if df.empty:
+            continue
+        frames.append(df)
+    # Load each multi-parameter group sweep CSV
+    for name, params in {
+        "resting_potentials": ["Vs0", "Vus0"],
+        "ultraslow_dynamics": ["g_us", "delta_Vus", "tau_us"],
+        "slow_dynamics": ["g_s", "tau_s"],
+        "synaptic": ["g_syn_i", "tau_i", "Vi_threshold", "Vi0"],
+    }.items():
+        df = _load_csv(MULTI_DIR / f"{name}_sweep.csv")
+        if df is None:
+            continue
+        df = _only_bursting(_average_features(df))
+        if df.empty:
+            continue
+        frames.append(df)
+    # Concatenate all data and drop duplicate parameter sets (if any)
+    if not frames:
+        return pd.DataFrame()  # no data
+    combined = pd.concat(frames, ignore_index=True)
+    # Drop exact duplicate rows (e.g., identical param combinations from overlapping sweeps)
+    param_cols = [c for c in combined.columns if c in all_params]
+    combined = combined.drop_duplicates(subset=param_cols).reset_index(drop=True)
+    return combined
+
+# New function to analyze one feature using all parameters
+def analyse_all_params_for_feature(feature: str, df: pd.DataFrame, degree: int = 1) -> None:
+    if feature not in df.columns:
+        return
+    feature_dir = OUT_DIR / feature
+    feature_dir.mkdir(parents=True, exist_ok=True)
+    # Fit polynomial model with all parameters for this feature
+    params = [
+        "Vs0", "Vus0", "g_us", "delta_Vus", "tau_us",
+        "g_s", "tau_s", "g_syn_i", "tau_i", "Vi_threshold", "Vi0",
+    ]
+    res = _fit_polynomial(df, params, feature, degree)
+    if not res:
+        return
+    model, r2 = res
+    # Save equation and R²
+    eq = _format_equation(model, params)
+    with open(feature_dir / f"fit_{degree}.txt", "w") as f:
+        f.write(f"Equation: {eq}\nR2: {r2:.4f}\n")
+    # Save regression coefficients (including intercept) as JSON
+    poly = model.named_steps["polynomialfeatures"]
+    lin = model.named_steps["linearregression"]
+    terms = poly.get_feature_names_out(params)
+    coeffs = lin.coef_
+    intercept = lin.intercept_
+    # If a bias term '1' is present, incorporate it into the intercept for clarity
+    if terms.size > 0 and terms[0] == "1":
+        intercept += coeffs[0]
+        terms = terms[1:]
+        coeffs = coeffs[1:]
+    coeff_dict = {"Intercept": round(float(intercept), 6)}
+    for term, coef in zip(terms, coeffs):
+        coeff_dict[str(term)] = round(float(coef), 6)
+    with open(feature_dir / "coefficients.json", "w") as f:
+        json.dump(coeff_dict, f, indent=2)
+    # Plot predicted vs actual for this feature
+    _plot_multidim_fit(df, params, feature, model, feature_dir / f"fit_{degree}.png")
+
+# --- Inside main(), after existing analyses of single_params and param_groups ---
+    # Analyze each feature using all parameters (multi-parameter regression)
+    combined_df = _load_all_data()
+    if combined_df.empty:
+        print("No data available for multi-parameter analysis.")
+    else:
+        for feat in FEATURES:
+            analyse_all_params_for_feature(feat, combined_df, degree=1)
+
+
+
 def main() -> None:
     single_params = [
         "Vs0",
