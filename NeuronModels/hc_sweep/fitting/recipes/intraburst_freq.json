@@ -1,0 +1,45 @@
+{
+  "feature": "intraburst_freq",
+  "recommendation": [
+    {
+      "parameter": "Vs0",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.88)"
+    },
+    {
+      "parameter": "Vus0",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.70)"
+    },
+    {
+      "parameter": "g_us",
+      "direction": "increase",
+      "justification": "Weak positive correlation (r = 0.31)"
+    },
+    {
+      "parameter": "g_s",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.96)"
+    },
+    {
+      "parameter": "tau_s",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.99)"
+    },
+    {
+      "parameter": "tau_i",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.84)"
+    },
+    {
+      "parameter": "Vi_threshold",
+      "direction": "decrease",
+      "justification": "Moderate negative correlation (r = -0.45)"
+    },
+    {
+      "parameter": "Vi0",
+      "direction": "decrease",
+      "justification": "Weak negative correlation (r = -0.39)"
+    }
+  ]
+}

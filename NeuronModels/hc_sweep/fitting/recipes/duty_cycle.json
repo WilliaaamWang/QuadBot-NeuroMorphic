@@ -1,0 +1,55 @@
+{
+  "feature": "duty_cycle",
+  "recommendation": [
+    {
+      "parameter": "Vs0",
+      "direction": "decrease",
+      "justification": "Weak negative correlation (r = -0.35)"
+    },
+    {
+      "parameter": "Vus0",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.96)"
+    },
+    {
+      "parameter": "g_us",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.88)"
+    },
+    {
+      "parameter": "delta_Vus",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.89)"
+    },
+    {
+      "parameter": "tau_us",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.95)"
+    },
+    {
+      "parameter": "g_s",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.85)"
+    },
+    {
+      "parameter": "tau_s",
+      "direction": "increase",
+      "justification": "Strong positive correlation (r = 0.95)"
+    },
+    {
+      "parameter": "g_syn_i",
+      "direction": "decrease",
+      "justification": "Moderate negative correlation (r = -0.61)"
+    },
+    {
+      "parameter": "tau_i",
+      "direction": "decrease",
+      "justification": "Strong negative correlation (r = -0.79)"
+    },
+    {
+      "parameter": "Vi_threshold",
+      "direction": "decrease",
+      "justification": "Weak negative correlation (r = -0.31)"
+    }
+  ]
+}

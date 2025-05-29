@@ -25,6 +25,8 @@ NeuronModels/hc_sweep/data/*
 
 NeuronModels/hc_sweep/plots/traces/*
 !NeuronModels/hc_sweep/plots/traces/.gitkeep
+!NeuronModels/hc_sweep/plots/traces/multi
+!NeuronModels/hc_sweep/plots/traces/single
 
 NeuronModels/param_sweep/*
 !NeuronModels/param_sweep/.gitkeep
