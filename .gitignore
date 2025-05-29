@@ -10,8 +10,8 @@ src/testneuron1/Plots
 
 
 # Ignore all contents under NeuronModels subdirectories recursively
-NeuronModels/Halfcentre_Plots/*
-!NeuronModels/Halfcentre_Plots/.gitkeep
+# NeuronModels/Halfcentre_Plots/*
+# !NeuronModels/Halfcentre_Plots/.gitkeep
 
 NeuronModels/hc_sweep/data/*
 !NeuronModels/hc_sweep/data/.gitkeep
