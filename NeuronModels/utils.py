@@ -204,9 +204,13 @@ def extract_features(V_trace, dt, skip_bursts: int = 0, window_bursts: int | Non
     # features["burst_freq"] = float(1.0 / np.mean(periods)) if periods else np.nan
     # features["duty_cycle"] = float(np.mean([d / p for d, p in zip(durations, periods)])) if periods else np.nan
 
-    # Regime classification based on selected bursts
-    if n_bursts > 1:
-        features["regime"] = "bursting"
+    # Regime classification based on presence of long inter-spike gaps
+    if spike_count > 1 and not np.isnan(mean_isi):
+        gap_thresh = mean_isi * 5.0
+        if np.any(isi > gap_thresh):
+            features["regime"] = "bursting"
+        else:
+            features["regime"] = "tonic_spiking"
     else:
         features["regime"] = "tonic_spiking"
 

@@ -171,6 +171,15 @@ def create_output_dirs():
     }
     for d in dirs.values():
         os.makedirs(d, exist_ok=True)
+    
+    # Trace directories for single and multi sweeps
+    trace_single = os.path.join(dirs['plots'], 'traces', 'single')
+    trace_multi  = os.path.join(dirs['plots'], 'traces', 'multi')
+    os.makedirs(trace_single, exist_ok=True)
+    os.makedirs(trace_multi, exist_ok=True)
+
+    dirs['trace_single'] = trace_single
+    dirs['trace_multi'] = trace_multi
     return dirs
 
 def create_I_ext():
@@ -188,7 +197,8 @@ def run_single_simulation(params_dict, save_trace=False):
     neuron_params.update(params_dict)
 
     # Create the diff in inhibitory threshold for half-centre neurons
-    Vi_threshold_A = neuron_params.get('Vi_threshold', DEFAULT_PARAMS['Vi_threshold'])
+    vi_thresh = neuron_params.pop('Vi_threshold', DEFAULT_PARAMS['Vi_threshold'])
+    Vi_threshold_A = vi_thresh
     Vi_threshold_B = Vi_threshold_A * INHIB_THRESH_FACTOR
     
     
@@ -454,14 +464,14 @@ def run_gpu_batch(param_combinations,
             # --- feature extraction (still CPU; minimal data copy) ---
             feats_A = extract_features(
                 # V_A_cpu if keep_trace else V_A_trace[local_i].detach().cpu().numpy()[::64],  # decimate if trace not saved
-                V_A_cpu[global_i],
+                V_A_cpu[local_i],
                 DT,
                 skip_bursts=FEATURE_SKIP_BURSTS,
                 window_bursts=FEATURE_WINDOW_BURSTS,
             )
             feats_B = extract_features(
                 # V_B_cpu if keep_trace else V_B_trace[local_i].detach().cpu().numpy()[::64],
-                V_B_cpu[global_i],
+                V_B_cpu[local_i],
                 DT,
                 skip_bursts=FEATURE_SKIP_BURSTS,
                 window_bursts=FEATURE_WINDOW_BURSTS,
@@ -498,8 +508,24 @@ def run_gpu_batch(param_combinations,
 
     return results
 
-def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: dict):
-    """Draw the two‑neuron voltage traces already stored in *result_dict*."""
+def _plot_voltage_trace(result_dict: dict, param_name: str, label: str,
+                        dirs: dict, sweep_type: str = "single"):
+    """Draw the two‑neuron voltage traces already stored in *result_dict*.
+
+    Parameters
+    ----------
+    result_dict : dict
+        Simulation result containing ``V_trace_A/B`` and ``time``.
+    param_name : str
+        Name of the parameter group.
+    label : str
+        File label for the saved plot.
+    dirs : dict
+        Directory mapping returned by ``create_output_dirs``.
+    sweep_type : str
+        Either ``"single"`` or ``"multi"`` determining the subfolder used for
+        saving the figure.
+    """
     if "V_trace_A" not in result_dict:
         return  # nothing to save
 
@@ -519,8 +545,10 @@ def _plot_voltage_trace(result_dict: dict, param_name: str, label: str, dirs: di
 
     fig.suptitle(f"{param_name} sweep – {label}")
     plt.tight_layout()
-    fname = f"single_{label}.png"
-    plt.savefig(os.path.join(dirs["plots"], "traces", fname), dpi=150)
+    plot_dir = os.path.join(dirs["plots"], "traces", sweep_type)
+    os.makedirs(plot_dir, exist_ok=True)
+    fname = f"{sweep_type}_{label}.png"
+    plt.savefig(os.path.join(plot_dir, fname), dpi=150)
     plt.close(fig)
 
 
@@ -578,7 +606,7 @@ def single_param_sweep(param_name: str,
     for idx in trace_indices:
         res = results[idx]
         label = f"{param_name}_{res[param_name]:.3f}"
-        _plot_voltage_trace(res, param_name, label, dirs)
+        _plot_voltage_trace(res, param_name, label, dirs, sweep_type="single")
 
     # ---------------- persist numeric results -----------------------
     df = pd.DataFrame(results)
@@ -646,8 +674,10 @@ def plot_single_param_results(df, param_name, param_values, dirs):
     plt.savefig(os.path.join(dirs['plots'], f'{param_name}_single_sweep.png'), dpi=150)
     plt.close()
 
-def multi_param_sweep(group_name, param_names, dirs):
-    """Sweep multiple parameters together."""
+
+def multi_param_sweep(group_name, param_names, dirs,
+                      n_plot: int = TRACE_SAMPLES_MULTI):
+    """Sweep multiple parameters together and optionally save example traces."""
     print(f"\n――― Multi‑parameter sweep: {group_name}  ({len(param_names)} dims) ―――")
     
     # Create all combinations
@@ -657,30 +687,56 @@ def multi_param_sweep(group_name, param_names, dirs):
     
     print(f"Total combinations: {len(param_dicts)}")
     
+    n_total = len(param_dicts)
+
+    if n_plot >= n_total:
+        trace_indices = list(range(n_total))
+    else:
+        trace_indices = np.linspace(0, n_total - 1, n_plot, dtype=int).tolist()
+
     # Run simulations
     results = []
-    if HAS_TORCH and len(param_dicts) > 50:
-        # Use GPU for batch processing
+    use_gpu = HAS_TORCH and n_total > 50
+    if use_gpu:
         batch_size = 200
-        for i in tqdm(range(0, len(param_dicts), batch_size), desc="GPU batches"):
-            batch = param_dicts[i:i+batch_size]
-            batch_results = run_gpu_batch(batch)
-            if batch_results:
-                results.extend(batch_results)
-            else:
-                # Fallback
-                for combo in batch:
-                    results.append(run_single_simulation(combo, False))
-    else:
-        # Use CPU
+    #     for i in tqdm(range(0, len(param_dicts), batch_size), desc="GPU batches"):
+    #         batch = param_dicts[i:i+batch_size]
+    #         batch_results = run_gpu_batch(batch)
+    #         if batch_results:
+    #             results.extend(batch_results)
+    #         else:
+    #             # Fallback
+    #             for combo in batch:
+    #                 results.append(run_single_simulation(combo, False))
+    # else:
+    #     # Use CPU
+        results = run_gpu_batch(param_dicts, 
+                                trace_indices=trace_indices,
+                                batch_size=batch_size)
+        if results is None:
+            use_gpu = False
+
+    if not use_gpu:
+        trace_set = set(trace_indices)
         if HAS_JOBLIB:
             results = Parallel(n_jobs=-1)(
-                delayed(run_single_simulation)(combo, False)
-                for combo in tqdm(param_dicts, desc=group_name)
+                # delayed(run_single_simulation)(combo, False)
+                # for combo in tqdm(param_dicts, desc=group_name)
+                delayed(run_single_simulation)(combo, i in trace_set)
+                for i, combo in enumerate(tqdm(param_dicts, desc=group_name))
             )
         else:
-            for combo in tqdm(param_dicts, desc=group_name):
-                results.append(run_single_simulation(combo, False))
+            # for combo in tqdm(param_dicts, desc=group_name):
+            #     results.append(run_single_simulation(combo, False))
+            for i, combo in enumerate(tqdm(param_dicts, desc=group_name)):
+                results.append(run_single_simulation(combo, i in trace_set))
+    else:
+        # GPU path lacks trace data – run selected indices again on CPU
+        for idx in trace_indices:
+            trace_res = run_single_simulation(param_dicts[idx], save_trace=True)
+            results[idx]['V_trace_A'] = trace_res['V_trace_A']
+            results[idx]['V_trace_B'] = trace_res['V_trace_B']
+            results[idx]['time'] = trace_res['time']
     
     # Save results
     df = pd.DataFrame(results)
@@ -691,6 +747,25 @@ def multi_param_sweep(group_name, param_names, dirs):
     pkl_path = os.path.join(dirs['data'], f'{group_name}_results.pkl')
     with open(pkl_path, 'wb') as f:
         pickle.dump(df, f)
+
+    # Plot a subset of example traces
+    for idx in trace_indices:
+        res = results[idx]
+        label_vals = '_'.join(f'{p}{res[p]:.3f}' for p in param_names)
+        _plot_voltage_trace(res, group_name, label_vals, dirs, sweep_type="multi")
+
+    # Store traces to disk
+    h5_path = os.path.join(dirs['data'], f'{group_name}_traces.h5')
+    with h5py.File(h5_path, "w") as f:
+        for i, res in enumerate(results):
+            if 'V_trace_A' in res:
+                grp = f.create_group(f"sim_{i}")
+                grp.create_dataset("V_A", data=res['V_trace_A'])
+                grp.create_dataset("V_B", data=res['V_trace_B'])
+                grp.create_dataset("time", data=res['time'])
+                for p in param_names:
+                    grp.attrs[p] = res[p]
+
     
     # Plot results based on dimensionality
     if len(param_names) == 2:
@@ -701,6 +776,35 @@ def multi_param_sweep(group_name, param_names, dirs):
         plot_4d_results(df, param_names, group_name, dirs)
     
     return df
+
+def pairwise_sweep(group_name: str, param_names: list[str], dirs: dict,
+                   n_plot: int = TRACE_SAMPLES_MULTI) -> list[pd.DataFrame]:
+    """Run 2‑D sweeps for every parameter pair in ``param_names``.
+
+    Parameters
+    ----------
+    group_name : str
+        Name of the parameter group (used as prefix for file names).
+    param_names : list[str]
+        List of parameters.  Every unique pair will be swept.
+    dirs : dict
+        Directory mapping as returned by :func:`create_output_dirs`.
+    n_plot : int, optional
+        Number of traces to save per sweep. Defaults to ``TRACE_SAMPLES_MULTI``.
+
+    Returns
+    -------
+    list[pandas.DataFrame]
+        DataFrames for each pairwise sweep.
+    """
+
+    dfs: list[pd.DataFrame] = []
+    for p1, p2 in itertools.combinations(param_names, 2):
+        pair_label = f"{group_name}_{p1}_{p2}"
+        df = multi_param_sweep(pair_label, [p1, p2], dirs, n_plot=n_plot)
+        dfs.append(df)
+    return dfs
+
 
 def plot_2d_results(df, param_names, group_name, dirs):
     """Plot 2D parameter sweep results as heatmaps."""
@@ -821,14 +925,27 @@ def main():
     # 1) SINGLE‑PARAMETER SWEEPS
     single_dfs = []
     for p_name, p_vals in PARAM_RANGES.items():
-        df = single_param_sweep(p_name, p_vals, dirs)
-        single_dfs.append(df)
+        df = single_param_sweep(p_name, p_vals, dirs,
+                                n_plot=TRACE_SAMPLES_SINGLE)
 
-    # # 2) MULTI‑PARAMETER GROUP SWEEPS
+    # 2) MULTI‑PARAMETER GROUP SWEEPS
+    # multi_dfs = []
+    # for grp, names in PARAM_GROUPS.items():
+    #     df = multi_param_sweep(grp, names, dirs,
+    #                            n_plot=TRACE_SAMPLES_MULTI)
+        
+    # 2) MULTI‑PARAMETER GROUP SWEEPS (pairwise)
     multi_dfs = []
     for grp, names in PARAM_GROUPS.items():
-        df = multi_param_sweep(grp, names, dirs)
-        multi_dfs.append(df)
+        if len(names) > 2:
+            pair_dfs = pairwise_sweep(grp, names, dirs,
+                                      n_plot=TRACE_SAMPLES_MULTI)
+            multi_dfs.extend(pair_dfs)
+        else:
+            df = multi_param_sweep(grp, names, dirs,
+                                   n_plot=TRACE_SAMPLES_MULTI)
+            multi_dfs.append(df)
+    
 
     # 3) Aggregation (optional but handy)
     _concat_and_store(single_dfs + multi_dfs, dirs)
