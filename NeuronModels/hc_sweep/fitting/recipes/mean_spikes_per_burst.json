@@ -4,7 +4,7 @@
     {
       "parameter": "Vs0",
       "direction": "increase",
-      "justification": "Strong positive correlation (r = 0.81)"
+      "justification": "Strong positive correlation (r = 1.00)"
     },
     {
       "parameter": "Vus0",
@@ -14,37 +14,42 @@
     {
       "parameter": "g_us",
       "direction": "decrease",
-      "justification": "Strong negative correlation (r = -0.96)"
+      "justification": "Strong negative correlation (r = -0.97)"
     },
     {
       "parameter": "delta_Vus",
       "direction": "decrease",
-      "justification": "Strong negative correlation (r = -0.91)"
+      "justification": "Strong negative correlation (r = -0.98)"
     },
     {
       "parameter": "tau_us",
       "direction": "decrease",
-      "justification": "Strong negative correlation (r = -0.95)"
+      "justification": "Strong negative correlation (r = -0.89)"
     },
     {
       "parameter": "g_s",
       "direction": "increase",
-      "justification": "Strong positive correlation (r = 0.89)"
+      "justification": "Strong positive correlation (r = 0.98)"
     },
     {
       "parameter": "tau_s",
       "direction": "increase",
-      "justification": "Strong positive correlation (r = 0.85)"
+      "justification": "Strong positive correlation (r = 0.99)"
+    },
+    {
+      "parameter": "tau_i",
+      "direction": "increase",
+      "justification": "Moderate positive correlation (r = 0.57)"
     },
     {
       "parameter": "Vi_threshold",
       "direction": "decrease",
-      "justification": "Moderate negative correlation (r = -0.44)"
+      "justification": "Moderate negative correlation (r = -0.45)"
     },
     {
       "parameter": "Vi0",
       "direction": "decrease",
-      "justification": "Moderate negative correlation (r = -0.46)"
+      "justification": "Moderate negative correlation (r = -0.69)"
     }
   ]
 }

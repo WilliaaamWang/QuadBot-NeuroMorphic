@@ -1,2 +1,2 @@
-Before: 0.069184 + (0.000000*1) + (-0.017384*Vi_threshold) + (-0.000394*Vi_threshold^2) (R2=0.1111)
-After: 0.166086 + (0.000000*1) + (-0.008760*Vi_threshold) + (-0.000204*Vi_threshold^2) (R2=0.0473)
+Before: 0.034312 + (0.000000*1) + (-0.024728*Vi_threshold) + (-0.000639*Vi_threshold^2) (R2=0.1816)
+After: 0.243264 + (0.000000*1) + (-0.003828*Vi_threshold) + (-0.000120*Vi_threshold^2) (R2=0.3773)

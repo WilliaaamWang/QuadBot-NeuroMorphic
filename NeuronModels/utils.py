@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.stats import gaussian_kde
 
-def detect_spikes(trace, fs, threshold=-10.0, refractory_ms=2.0, prominence=5.0):
+def detect_spikes(trace, fs, threshold=20.0, refractory_ms=2.0, prominence=5.0):
     """Detect spikes in voltage trace using peak detection.
     
     Parameters

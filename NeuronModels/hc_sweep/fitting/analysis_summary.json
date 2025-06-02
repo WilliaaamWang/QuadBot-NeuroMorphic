@@ -1,0 +1,29 @@
+{
+  "n_samples": 4188,
+  "features": {
+    "interburst_freq": {
+      "cv_r2": -131.2818863037618,
+      "train_r2": 0.8863294829357864,
+      "alpha": 10.0,
+      "n_samples_clean": 3593
+    },
+    "intraburst_freq": {
+      "cv_r2": 0.32662533603675037,
+      "train_r2": 0.3493781595960356,
+      "alpha": 10.0,
+      "n_samples_clean": 3818
+    },
+    "duty_cycle": {
+      "cv_r2": -65.80698320954012,
+      "train_r2": 0.7783117480834627,
+      "alpha": 0.001,
+      "n_samples_clean": 3504
+    },
+    "mean_spikes_per_burst": {
+      "cv_r2": 0.6435186405359044,
+      "train_r2": 0.67632394609486,
+      "alpha": 10.0,
+      "n_samples_clean": 2990
+    }
+  }
+}

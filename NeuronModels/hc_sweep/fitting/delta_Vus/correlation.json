@@ -1,6 +1,6 @@
 {
-  "interburst_freq": 0.633992469990778,
-  "intraburst_freq": -0.27700339475916447,
-  "duty_cycle": -0.8858517227121204,
-  "mean_spikes_per_burst": -0.9136035339448615
+  "interburst_freq": 0.9837459529204541,
+  "intraburst_freq": -0.25671443348347806,
+  "duty_cycle": -0.9770217147347686,
+  "mean_spikes_per_burst": -0.9783567842838176
 }

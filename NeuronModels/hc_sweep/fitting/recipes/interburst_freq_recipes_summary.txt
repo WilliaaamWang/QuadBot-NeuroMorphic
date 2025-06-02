@@ -1,0 +1,228 @@
+Recipe Report for interburst_freq
+==================================================
+
+Parameter Importance Ranking:
+1. g_us: sensitivity = 12.0868
+2. g_s: sensitivity = 2.7588
+3. delta_Vus: sensitivity = 0.2505
+4. Vs0: sensitivity = 0.0961
+5. tau_s: sensitivity = 0.0896
+
+--------------------------------------------------
+
+Target Change: -1
+------------------------------
+
+SIMPLE Recipe:
+  g_us: -50.0% (0.015 → 0.007)
+  g_s: +13.2% (0.500 → 0.566)
+  delta_Vus: -3.9% (1.700 → 1.634)
+  Predicted change: -0.3028
+  Confidence: 77.6%
+
+MINIMAL Recipe:
+  Vs0: +6.9% (-50.000 → -46.558)
+  Predicted change: -1.0000
+  Confidence: 93.1%
+
+BALANCED Recipe:
+  Vs0: +6.0% (-50.000 → -46.995)
+  Vus0: +1.8% (-52.000 → -51.049)
+  g_s: +1.0% (0.500 → 0.505)
+  Predicted change: -0.9821
+  Confidence: 97.0%
+
+CONSERVATIVE Recipe:
+  Vs0: +4.2% (-50.000 → -47.882)
+  Vus0: +4.2% (-52.000 → -49.797)
+  g_us: -4.0% (0.015 → 0.014)
+  delta_Vus: -4.2% (1.700 → 1.628)
+  tau_us: -4.2% (278.000 → 266.229)
+  g_s: +4.2% (0.500 → 0.521)
+  tau_s: +3.9% (4.300 → 4.470)
+  g_syn_i: -2.8% (30.000 → 29.152)
+  tau_i: +3.8% (50.000 → 51.917)
+  Vi_threshold: -4.2% (-20.000 → -20.846)
+  Vi0: -1.6% (-90.000 → -91.449)
+  Predicted change: -1.0000
+  Confidence: 96.2%
+
+Target Change: -0.4
+------------------------------
+
+SIMPLE Recipe:
+  g_us: -50.0% (0.015 → 0.007)
+  g_s: +5.3% (0.500 → 0.526)
+  delta_Vus: -1.6% (1.700 → 1.674)
+  Predicted change: -0.1778
+  Confidence: 81.0%
+
+MINIMAL Recipe:
+  Vs0: +3.8% (-50.000 → -48.076)
+  Predicted change: -0.4000
+  Confidence: 96.2%
+
+BALANCED Recipe:
+  Vs0: +3.4% (-50.000 → -48.298)
+  Predicted change: -0.3333
+  Confidence: 96.6%
+
+CONSERVATIVE Recipe:
+  Vs0: -5.0% (-50.000 → -52.491)
+  Vus0: -5.0% (-52.000 → -54.591)
+  delta_Vus: +1.6% (1.700 → 1.727)
+  tau_s: +4.9% (4.300 → 4.513)
+  g_syn_i: +5.0% (30.000 → 31.495)
+  tau_i: +4.7% (50.000 → 52.328)
+  Vi0: -2.4% (-90.000 → -92.115)
+  Predicted change: -0.4001
+  Confidence: 95.9%
+
+Target Change: -0.2
+------------------------------
+
+SIMPLE Recipe:
+  g_us: -50.0% (0.015 → 0.007)
+  g_s: +2.6% (0.500 → 0.513)
+  delta_Vus: -0.8% (1.700 → 1.687)
+  Predicted change: -0.1414
+  Confidence: 82.2%
+
+MINIMAL Recipe:
+  Vs0: +2.4% (-50.000 → -48.809)
+  Predicted change: -0.2000
+  Confidence: 97.6%
+
+BALANCED Recipe:
+  Vs0: +2.1% (-50.000 → -48.935)
+  Predicted change: -0.1716
+  Confidence: 97.9%
+
+CONSERVATIVE Recipe:
+  Vs0: +1.8% (-50.000 → -49.109)
+  Vus0: +1.8% (-52.000 → -51.074)
+  g_us: -1.6% (0.015 → 0.015)
+  delta_Vus: -1.8% (1.700 → 1.670)
+  Predicted change: -0.1965
+  Confidence: 98.3%
+
+Target Change: +0.2
+------------------------------
+
+SIMPLE Recipe:
+  g_us: +88.3% (0.015 → 0.028)
+  g_s: -2.6% (0.500 → 0.487)
+  delta_Vus: +0.8% (1.700 → 1.713)
+  Predicted change: 0.1862
+  Confidence: 69.4%
+
+MINIMAL Recipe:
+  g_s: -12.4% (0.500 → 0.438)
+  Vi0: +1.7% (-90.000 → -88.504)
+  Predicted change: 0.2025
+  Confidence: 93.0%
+
+BALANCED Recipe:
+  Vs0: -3.2% (-50.000 → -51.612)
+  Vus0: +4.6% (-52.000 → -49.622)
+  Predicted change: 0.1862
+  Confidence: 96.1%
+
+CONSERVATIVE Recipe:
+  Vs0: -2.9% (-50.000 → -51.429)
+  g_us: +6.2% (0.015 → 0.016)
+  delta_Vus: -3.2% (1.700 → 1.645)
+  tau_us: +6.2% (278.000 → 295.228)
+  g_s: -2.9% (0.500 → 0.486)
+  tau_s: -1.2% (4.300 → 4.247)
+  tau_i: +6.2% (50.000 → 53.086)
+  Vi_threshold: -6.2% (-20.000 → -21.237)
+  Vi0: +6.2% (-90.000 → -84.423)
+  Predicted change: 0.2007
+  Confidence: 95.4%
+
+Target Change: +0.4
+------------------------------
+
+SIMPLE Recipe:
+  g_us: +176.6% (0.015 → 0.041)
+  g_s: -5.3% (0.500 → 0.474)
+  delta_Vus: +1.6% (1.700 → 1.726)
+  Predicted change: 0.3249
+  Confidence: 38.8%
+
+MINIMAL Recipe:
+  g_s: -22.3% (0.500 → 0.388)
+  tau_s: -1.4% (4.300 → 4.241)
+  Predicted change: 0.3905
+  Confidence: 88.1%
+
+BALANCED Recipe:
+  Vs0: -4.8% (-50.000 → -52.403)
+  Vus0: +8.0% (-52.000 → -47.856)
+  delta_Vus: -1.3% (1.700 → 1.678)
+  g_s: +1.4% (0.500 → 0.507)
+  tau_i: +1.0% (50.000 → 50.502)
+  Predicted change: 0.3888
+  Confidence: 96.7%
+
+CONSERVATIVE Recipe:
+  Vus0: -8.0% (-52.000 → -56.134)
+  g_us: +8.5% (0.015 → 0.016)
+  delta_Vus: +8.5% (1.700 → 1.844)
+  tau_us: +8.4% (278.000 → 301.339)
+  g_s: -8.5% (0.500 → 0.457)
+  tau_s: -8.5% (4.300 → 3.935)
+  g_syn_i: -8.5% (30.000 → 27.464)
+  tau_i: +8.7% (50.000 → 54.339)
+  Vi_threshold: -8.5% (-20.000 → -21.696)
+  Vi0: +8.6% (-90.000 → -82.265)
+  Predicted change: 0.4020
+  Confidence: 91.5%
+
+Target Change: +1
+------------------------------
+
+SIMPLE Recipe:
+  g_us: +200.0% (0.015 → 0.045)
+  g_s: -13.2% (0.500 → 0.434)
+  delta_Vus: +3.9% (1.700 → 1.766)
+  Predicted change: 0.5588
+  Confidence: 27.6%
+
+MINIMAL Recipe:
+  Vs0: -7.4% (-50.000 → -53.676)
+  Vus0: +13.1% (-52.000 → -45.193)
+  tau_us: +1.6% (278.000 → 282.325)
+  tau_s: -22.0% (4.300 → 3.356)
+  g_syn_i: -4.0% (30.000 → 28.811)
+  tau_i: +5.9% (50.000 → 52.957)
+  Vi0: +11.6% (-90.000 → -79.580)
+  Predicted change: 0.9728
+  Confidence: 90.7%
+
+BALANCED Recipe:
+  Vs0: -7.8% (-50.000 → -53.879)
+  Vus0: +14.3% (-52.000 → -44.561)
+  delta_Vus: -2.4% (1.700 → 1.659)
+  g_s: +4.1% (0.500 → 0.521)
+  tau_i: +1.7% (50.000 → 50.836)
+  Vi_threshold: -1.2% (-20.000 → -20.234)
+  Predicted change: 0.9894
+  Confidence: 94.8%
+
+CONSERVATIVE Recipe:
+  Vs0: +6.1% (-50.000 → -46.932)
+  Vus0: -17.5% (-52.000 → -61.115)
+  g_us: +13.4% (0.015 → 0.017)
+  delta_Vus: +17.7% (1.700 → 2.001)
+  tau_us: +13.5% (278.000 → 315.466)
+  g_s: -2.1% (0.500 → 0.489)
+  tau_s: -17.7% (4.300 → 3.540)
+  g_syn_i: -17.4% (30.000 → 24.787)
+  tau_i: +17.7% (50.000 → 58.850)
+  Vi_threshold: +3.0% (-20.000 → -19.391)
+  Vi0: +14.0% (-90.000 → -77.355)
+  Predicted change: 1.0000
+  Confidence: 87.3%
+

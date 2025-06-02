@@ -1,0 +1,437 @@
+{
+  "feature": "mean_spikes_per_burst",
+  "parameter_ranking": [
+    [
+      "g_us",
+      528.6931277340567
+    ],
+    [
+      "g_s",
+      26.778602986039132
+    ],
+    [
+      "delta_Vus",
+      12.029038009715618
+    ],
+    [
+      "Vs0",
+      8.468593720997053
+    ],
+    [
+      "tau_s",
+      1.8762830120497105
+    ],
+    [
+      "Vus0",
+      0.6732770307203777
+    ],
+    [
+      "Vi_threshold",
+      0.0503797476903455
+    ],
+    [
+      "tau_us",
+      0.04127958282850384
+    ],
+    [
+      "Vi0",
+      0.040498045197813255
+    ],
+    [
+      "g_syn_i",
+      0.036896784905046685
+    ],
+    [
+      "tau_i",
+      0.0161471610827831
+    ]
+  ],
+  "recipes": {
+    "target_-5": {
+      "simple": {
+        "recipe": {
+          "g_us": 0.5873707168351594,
+          "g_s": -0.017621121505054783,
+          "delta_Vus": 0.005182682795604348
+        },
+        "evaluation": {
+          "predicted_change": -14.241346374706676,
+          "confidence": 0.7966084929547271,
+          "n_params_changed": 3,
+          "avg_param_change": 0.20339150704527284
+        },
+        "readable_changes": {
+          "g_us": "+58.7% (+0.009)",
+          "g_s": "-1.8% (-0.009)",
+          "delta_Vus": "+0.5% (+0.009)"
+        }
+      },
+      "minimal": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "balanced": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "conservative": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      }
+    },
+    "target_-2": {
+      "simple": {
+        "recipe": {
+          "g_us": 0.23494828673406376,
+          "g_s": -0.007048448602021913,
+          "delta_Vus": 0.0020730731182417392
+        },
+        "evaluation": {
+          "predicted_change": -3.523954426860767,
+          "confidence": 0.9186433971818908,
+          "n_params_changed": 3,
+          "avg_param_change": 0.08135660281810914
+        },
+        "readable_changes": {
+          "g_us": "+23.5% (+0.004)",
+          "g_s": "-0.7% (-0.004)",
+          "delta_Vus": "+0.2% (+0.004)"
+        }
+      },
+      "minimal": {
+        "recipe": {
+          "Vus0": -0.027291103801291492
+        },
+        "evaluation": {
+          "predicted_change": -1.9995066807749744,
+          "confidence": 0.9727088961987085,
+          "n_params_changed": 1,
+          "avg_param_change": 0.027291103801291492
+        },
+        "readable_changes": {
+          "Vus0": "-2.7% (-1.419)"
+        }
+      },
+      "balanced": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "conservative": {
+        "recipe": {
+          "g_us": 0.027502357159812654,
+          "delta_Vus": 0.02736107972919666,
+          "tau_us": 0.027493855952723023,
+          "tau_s": -0.027079256491632415,
+          "g_syn_i": -0.023064804723531313,
+          "tau_i": -0.02736113985972019,
+          "Vi_threshold": -0.02561961038288252,
+          "Vi0": 0.025725477079690535
+        },
+        "evaluation": {
+          "predicted_change": -1.980065411524576,
+          "confidence": 0.9735990523276014,
+          "n_params_changed": 8,
+          "avg_param_change": 0.026400947672398662
+        },
+        "readable_changes": {
+          "g_us": "+2.8% (+0.000)",
+          "delta_Vus": "+2.7% (+0.047)",
+          "tau_us": "+2.7% (+7.643)",
+          "tau_s": "-2.7% (-0.116)",
+          "g_syn_i": "-2.3% (-0.692)",
+          "tau_i": "-2.7% (-1.368)",
+          "Vi_threshold": "-2.6% (-0.512)",
+          "Vi0": "+2.6% (+2.315)"
+        }
+      }
+    },
+    "target_-1": {
+      "simple": {
+        "recipe": {
+          "g_us": 0.11747414336703188,
+          "g_s": -0.0035242243010109565,
+          "delta_Vus": 0.0010365365591208696
+        },
+        "evaluation": {
+          "predicted_change": -1.3998798595933994,
+          "confidence": 0.9593216985909454,
+          "n_params_changed": 3,
+          "avg_param_change": 0.04067830140905457
+        },
+        "readable_changes": {
+          "g_us": "+11.7% (+0.002)",
+          "g_s": "-0.4% (-0.002)",
+          "delta_Vus": "+0.1% (+0.002)"
+        }
+      },
+      "minimal": {
+        "recipe": {
+          "Vus0": -0.01682624743668385
+        },
+        "evaluation": {
+          "predicted_change": -1.0000558305609992,
+          "confidence": 0.9831737525633162,
+          "n_params_changed": 1,
+          "avg_param_change": 0.01682624743668385
+        },
+        "readable_changes": {
+          "Vus0": "-1.7% (-0.875)"
+        }
+      },
+      "balanced": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "conservative": {
+        "recipe": {
+          "g_us": 0.016090620270697655,
+          "delta_Vus": 0.016582340594698503,
+          "tau_us": 0.016704202645027956,
+          "g_syn_i": -0.016776796914612827,
+          "tau_i": -0.016773942463353068,
+          "Vi_threshold": -0.01623056118155668,
+          "Vi0": 0.016776771801561
+        },
+        "evaluation": {
+          "predicted_change": -0.9417158485709791,
+          "confidence": 0.9834378234469274,
+          "n_params_changed": 7,
+          "avg_param_change": 0.016562176553072523
+        },
+        "readable_changes": {
+          "g_us": "+1.6% (+0.000)",
+          "delta_Vus": "+1.7% (+0.028)",
+          "tau_us": "+1.7% (+4.644)",
+          "g_syn_i": "-1.7% (-0.503)",
+          "tau_i": "-1.7% (-0.839)",
+          "Vi_threshold": "-1.6% (-0.325)",
+          "Vi0": "+1.7% (+1.510)"
+        }
+      }
+    },
+    "target_+1": {
+      "simple": {
+        "recipe": {
+          "g_us": -0.11747414336703188,
+          "g_s": 0.0035242243010109565,
+          "delta_Vus": -0.0010365365591208696
+        },
+        "evaluation": {
+          "predicted_change": 0.6756851519194313,
+          "confidence": 0.9593216985909454,
+          "n_params_changed": 3,
+          "avg_param_change": 0.04067830140905457
+        },
+        "readable_changes": {
+          "g_us": "-11.7% (-0.002)",
+          "g_s": "+0.4% (+0.002)",
+          "delta_Vus": "-0.1% (-0.002)"
+        }
+      },
+      "minimal": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "balanced": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "conservative": {
+        "recipe": {
+          "Vus0": 0.02426691943081266,
+          "g_us": -0.07557171291352376,
+          "g_s": 0.07551730396261727,
+          "tau_s": -0.07557171305412341,
+          "g_syn_i": -0.0747579175584947,
+          "tau_i": 0.07549024450974338,
+          "Vi_threshold": -0.07556930641470114,
+          "Vi0": 0.07557159824231223
+        },
+        "evaluation": {
+          "predicted_change": 2.036397562082019,
+          "confidence": 0.930960410489209,
+          "n_params_changed": 8,
+          "avg_param_change": 0.06903958951079106
+        },
+        "readable_changes": {
+          "Vus0": "+2.4% (+1.262)",
+          "g_us": "-7.6% (-0.001)",
+          "g_s": "+7.6% (+0.038)",
+          "tau_s": "-7.6% (-0.325)",
+          "g_syn_i": "-7.5% (-2.243)",
+          "tau_i": "+7.5% (+3.775)",
+          "Vi_threshold": "-7.6% (-1.511)",
+          "Vi0": "+7.6% (+6.801)"
+        }
+      }
+    },
+    "target_+2": {
+      "simple": {
+        "recipe": {
+          "g_us": -0.23494828673406376,
+          "g_s": 0.007048448602021913,
+          "delta_Vus": -0.0020730731182417392
+        },
+        "evaluation": {
+          "predicted_change": 0.6271755961648928,
+          "confidence": 0.9186433971818908,
+          "n_params_changed": 3,
+          "avg_param_change": 0.08135660281810914
+        },
+        "readable_changes": {
+          "g_us": "-23.5% (-0.004)",
+          "g_s": "+0.7% (+0.004)",
+          "delta_Vus": "-0.2% (-0.004)"
+        }
+      },
+      "minimal": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "balanced": {
+        "recipe": {},
+        "evaluation": {
+          "predicted_change": 0.0,
+          "confidence": 0,
+          "n_params_changed": 0,
+          "avg_param_change": NaN
+        },
+        "readable_changes": {}
+      },
+      "conservative": {
+        "recipe": {
+          "Vus0": -0.012386701737630422,
+          "g_s": 0.012388073522026248,
+          "g_syn_i": -0.011674310617508227,
+          "Vi0": -0.012388120287784675
+        },
+        "evaluation": {
+          "predicted_change": -0.44672302007624154,
+          "confidence": 0.9877906984587627,
+          "n_params_changed": 4,
+          "avg_param_change": 0.012209301541237392
+        },
+        "readable_changes": {
+          "Vus0": "-1.2% (-0.644)",
+          "g_s": "+1.2% (+0.006)",
+          "g_syn_i": "-1.2% (-0.350)",
+          "Vi0": "-1.2% (-1.115)"
+        }
+      }
+    },
+    "target_+5": {
+      "simple": {
+        "recipe": {
+          "g_us": -0.5,
+          "g_s": 0.017621121505054783,
+          "delta_Vus": -0.005182682795604348
+        },
+        "evaluation": {
+          "predicted_change": -2.1292542541310766,
+          "confidence": 0.8257320652331136,
+          "n_params_changed": 3,
+          "avg_param_change": 0.17426793476688637
+        },
+        "readable_changes": {
+          "g_us": "-50.0% (-0.007)",
+          "g_s": "+1.8% (+0.009)",
+          "delta_Vus": "-0.5% (-0.009)"
+        }
+      },
+      "minimal": {
+        "recipe": {
+          "Vs0": 0.013182794854050175,
+          "delta_Vus": -0.01673629237150228
+        },
+        "evaluation": {
+          "predicted_change": 5.0402114237283975,
+          "confidence": 0.9850404563872238,
+          "n_params_changed": 2,
+          "avg_param_change": 0.014959543612776228
+        },
+        "readable_changes": {
+          "Vs0": "+1.3% (+0.659)",
+          "delta_Vus": "-1.7% (-0.028)"
+        }
+      },
+      "balanced": {
+        "recipe": {
+          "Vs0": 0.011454550752197493
+        },
+        "evaluation": {
+          "predicted_change": 2.8796808921244192,
+          "confidence": 0.9885454492478025,
+          "n_params_changed": 1,
+          "avg_param_change": 0.011454550752197493
+        },
+        "readable_changes": {
+          "Vs0": "+1.1% (+0.573)"
+        }
+      },
+      "conservative": {
+        "recipe": {
+          "Vs0": 0.010397430920578538,
+          "Vus0": -0.010397141249618583
+        },
+        "evaluation": {
+          "predicted_change": 4.174342357660134,
+          "confidence": 0.9896027139149014,
+          "n_params_changed": 2,
+          "avg_param_change": 0.01039728608509856
+        },
+        "readable_changes": {
+          "Vs0": "+1.0% (+0.520)",
+          "Vus0": "-1.0% (-0.541)"
+        }
+      }
+    }
+  }
+}

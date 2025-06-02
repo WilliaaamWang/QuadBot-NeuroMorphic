@@ -137,7 +137,7 @@ for param, values in PARAM_RANGES.items():
 
 # Parameter groups for combined sweeps
 PARAM_GROUPS = {
-    'resting_potentials': ['Vs0', 'Vus0'],
+    'balance_point': ['Vs0', 'Vus0'],
     'ultraslow_dynamics': ['g_us', 'delta_Vus', 'tau_us'],
     'slow_dynamics': ['g_s', 'tau_s'],
     'synaptic': ['g_syn_i', 'tau_i', 'Vi_threshold', 'Vi0']

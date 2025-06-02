@@ -140,7 +140,7 @@ for param, values in PARAM_RANGES.items():
 
 # Parameter groups for combined sweeps
 PARAM_GROUPS = {
-    'resting_potentials': ['Vs0', 'Vus0'],
+    'balance_point': ['Vs0', 'Vus0'],
     # 'ultraslow_dynamics': ['g_us', 'delta_Vus', 'tau_us'],
     # 'slow_dynamics': ['g_s', 'tau_s'],
     # 'synaptic': ['g_syn_i', 'tau_i', 'Vi_threshold', 'Vi0']
@@ -983,6 +983,6 @@ def plot_from_trace(param_name: str, dirs: dict, n_plot: int = 20):
 if __name__ == "__main__":
     start = time.time()
     main()
-    # plot_from_trace("resting_potentials", create_output_dirs())
+    # plot_from_trace("balance_point", create_output_dirs())
     elapsed = time.time() - start
     print(f"\n🏁  Total runtime: {elapsed/60:.1f} min")
